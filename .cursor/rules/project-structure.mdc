@@ -1,0 +1,45 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Go Email Service Project Structure
+
+This document outlines the structure of the Go Email Service project.
+
+## 1. Main Entrypoint & Configuration
+- The application's main entrypoint is [cmd/main.go](mdc:email-service/cmd/main.go). It's responsible for initializing the server, loading configurations, and setting up dependencies.
+- All application configurations are defined in [config.yaml](mdc:email-service/config.yaml) and loaded by the logic in [internal/config/config.go](mdc:email-service/internal/config/config.go).
+
+## 2. Layered Architecture
+The project follows a standard layered architecture inside the `internal` directory.
+
+### a. Handlers (API Layer)
+- Location: `internal/handler/`
+- Handles HTTP requests, validates input, and calls the service layer.
+- Examples:
+  - [internal/handler/account_handler.go](mdc:email-service/internal/handler/account_handler.go)
+  - [internal/handler/sender_handler.go](mdc:email-service/internal/handler/sender_handler.go)
+
+### b. Services (Business Logic Layer)
+- Location: `internal/service/`
+- Contains the core business logic and orchestrates calls to the repository layer.
+- Examples:
+  - [internal/service/account_service.go](mdc:email-service/internal/service/account_service.go)
+  - [internal/service/sender_service.go](mdc:email-service/internal/service/sender_service.go)
+
+### c. Repositories (Data Access Layer)
+- Location: `internal/repository/`
+- Responsible for all database interactions using GORM.
+- Examples:
+  - [internal/repository/account_repository.go](mdc:email-service/internal/repository/account_repository.go)
+  - [internal/repository/sender_repository.go](mdc:email-service/internal/repository/sender_repository.go)
+
+## 3. Database
+- **Models**: All GORM database models are defined in [internal/model/models.go](mdc:email-service/internal/model/models.go).
+- **Migrations**: Database schema definitions and migration scripts are located in the `migrations/` directory. The primary schema is in [migrations/0001_initial_schema.up.sql](mdc:email-service/migrations/0001_initial_schema.up.sql).
+- **Connection**: The database connection is initialized in [pkg/database/postgres.go](mdc:email-service/pkg/database/postgres.go).
+
+## 4. Project Tracking
+- The overall project progress, roadmap, and setup instructions are documented in [README.md](mdc:email-service/README.md).
+

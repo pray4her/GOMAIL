@@ -1,0 +1,35 @@
+server:
+  port: ":8080"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "YJKJ"
+  dbname: "email_service_db"
+  sslmode: "disable"
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+rabbitmq:
+  url: "amqp://guest:guest@localhost:5672/"
+
+aliyun:
+  default_region: "cn-hangzhou"
+  endpoint: "dm.aliyuncs.com"
+  access_key_id: "YOUR_ACCESS_KEY_ID"
+  access_key_secret: "YOUR_ACCESS_KEY_SECRET"
+
+jwt:
+  secret: "your-secret-key" # Change this in production
+  expire_hours: 72
+
+logging:
+  level: "debug" # debug, info, warn, error
+  format: "json" # text, json 
+
+worker:
+  email_sender_count: 10 
