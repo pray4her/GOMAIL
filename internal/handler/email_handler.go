@@ -80,16 +80,12 @@ func (h *EmailHandler) SendSingleEmail(c *gin.Context) {
 	// 3. Create the job payload with all necessary data.
 	// For single sends, there is no AliyunTagName.
 	payload := model.EmailJobPayload{
-		Emails: []model.EmailInfo{
-			{
-				RecordID:       record.ID,
-				RecipientEmail: record.RecipientEmail,
-			},
-		},
-		Subject:       record.Subject,
-		Body:          record.Body,
-		AccountSender: *accountSender,
-		AliyunTagName: "", // No tag for single ad-hoc emails
+		RecordID:       record.ID,
+		RecipientEmail: record.RecipientEmail,
+		Subject:        record.Subject,
+		Body:           record.Body,
+		AccountSender:  *accountSender,
+		AliyunTagName:  "", // No tag for single ad-hoc emails
 	}
 
 	// 4. Marshal and enqueue the payload.

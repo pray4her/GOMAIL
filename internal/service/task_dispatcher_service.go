@@ -263,45 +263,32 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 
 			log.Printf("Successfully created %d records in batch for sender %d (Task %d, Page %d). Now enqueueing jobs.", len(recordsToCreate), accountSender.ID, task.ID, page)
 
-			const chunkSize = 100
-			for i := 0; i < len(recordsToCreate); i += chunkSize {
-				end := i + chunkSize
-				if end > len(recordsToCreate) {
-					end = len(recordsToCreate)
-				}
-				chunk := recordsToCreate[i:end]
-
-				emailInfos := make([]model.EmailInfo, 0, len(chunk))
-				var commonSubject, commonBody string
-				for j, record := range chunk {
-					emailInfos = append(emailInfos, model.EmailInfo{
-						RecordID:       record.ID,
-						RecipientEmail: record.RecipientEmail,
-					})
-					if j == 0 {
-						commonSubject = record.Subject
-						commonBody = record.Body
-					}
-				}
-
+			// Enqueue a separate job for each created record.
+			for _, record := range recordsToCreate {
 				payload := model.EmailJobPayload{
-					Emails:        emailInfos,
-					Subject:       commonSubject,
-					Body:          commonBody,
-					AccountSender: accountSender,
-					AliyunTagName: aliyunTagName,
+					RecordID:       record.ID,
+					RecipientEmail: record.RecipientEmail,
+					Subject:        record.Subject,
+					Body:           record.Body,
+					AccountSender:  accountSender,
+					AliyunTagName:  aliyunTagName,
 				}
 
 				payloadBytes, err := json.Marshal(payload)
 				if err != nil {
-					log.Printf("CRITICAL: Failed to marshal chunked job payload for task %d (Page %d): %v.", task.ID, page, err)
+					log.Printf("CRITICAL: Failed to marshal job payload for record %d: %v. Updating record to failed.", record.ID, err)
+					errMsg := err.Error()
+					_ = s.recordRepo.UpdateStatus(record.ID, model.RecordStatusFailed, "", &errMsg)
 					continue
 				}
 
 				if err := s.queue.Enqueue(ctx, queue.EmailSendingQueue, string(payloadBytes)); err != nil {
-					log.Printf("CRITICAL: Failed to enqueue chunked job for task %d (Page %d): %v.", task.ID, page, err)
+					log.Printf("CRITICAL: Failed to enqueue job for record %d: %v. Updating record to failed.", record.ID, err)
+					errMsg := err.Error()
+					_ = s.recordRepo.UpdateStatus(record.ID, model.RecordStatusFailed, "", &errMsg)
 				}
 			}
+
 			recipientOffset += count
 		}
 	}

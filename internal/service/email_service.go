@@ -34,71 +34,61 @@ func NewEmailService(
 	}
 }
 
-// ProcessEmailJob is now designed to handle a batch of emails contained within a single payload.
-// It iterates through the emails, sends them one by one, and updates their status individually.
+// ProcessEmailJob fetches a record by ID and sends the email.
+// This function is designed to be called by the background worker.
+// It receives all necessary data in the payload to avoid DB queries.
 func (s *EmailService) ProcessEmailJob(payload *model.EmailJobPayload) error {
-	if len(payload.Emails) == 0 {
-		return nil // Nothing to do
+	// 1. Immediately update status to 'sending'. This also verifies the record exists.
+	if err := s.recordRepo.UpdateStatus(payload.RecordID, model.RecordStatusSending, "", nil); err != nil {
+		return fmt.Errorf("worker: failed to set record %d to sending: %w", payload.RecordID, err)
 	}
 
-	// 1. Sender details are shared across the batch.
+	// 2. Sender details are already in the payload.
 	accountSender := &payload.AccountSender
 
-	// 2. Create a single Aliyun client for the entire batch.
+	// 3. Create a temporary Aliyun client.
 	client, err := aliyun.NewClient(
 		s.aliyunEndpoint,
 		accountSender.Account.AccessKeyID,
 		accountSender.Account.AccessKeySecret,
 	)
 	if err != nil {
-		// If client fails, the entire batch fails.
-		// A robust system would update all records in the batch to 'failed'.
-		return fmt.Errorf("worker: failed to create aliyun client for batch from sender %s: %w", accountSender.EmailAddress, err)
+		wrappedErr := fmt.Errorf("worker: failed to create aliyun client: %w", err)
+		errMsg := wrappedErr.Error()
+		// Best effort to update status, return the creation error anyway.
+		_ = s.recordRepo.UpdateStatus(payload.RecordID, model.RecordStatusFailed, "", &errMsg)
+		return wrappedErr
 	}
 
+	// 4. Send email via Aliyun. Tag name is already in the payload.
 	aliyunSender := aliyun.NewEmailSender(client)
+	requestID, err := aliyunSender.SendSingleEmail(
+		accountSender.EmailAddress,
+		accountSender.Sender.Name,
+		payload.RecipientEmail,
+		payload.Subject,
+		payload.Body,
+		payload.AliyunTagName,
+		true, // Enable ClickTrace
+	)
 
-	// 3. Process each email in the batch.
-	for _, emailInfo := range payload.Emails {
-		// Immediately update status to 'sending'.
-		if err := s.recordRepo.UpdateStatus(emailInfo.RecordID, model.RecordStatusSending, "", nil); err != nil {
-			// Log and continue to the next email. Don't let one failed update stop the whole batch.
-			// The record will remain 'pending'.
-			// A monitoring system should catch records stuck in 'pending'.
-			_ = fmt.Errorf("worker: failed to set record %d to sending: %w", emailInfo.RecordID, err)
-			continue
+	// 5. Update the record based on the sending result.
+	if err != nil {
+		errMsg := err.Error()
+		if updateErr := s.recordRepo.UpdateStatus(payload.RecordID, model.RecordStatusFailed, "", &errMsg); updateErr != nil {
+			return fmt.Errorf("worker: failed to update final status for record %d: %w", payload.RecordID, updateErr)
 		}
-
-		// Send email via Aliyun.
-		requestID, err := aliyunSender.SendSingleEmail(
-			accountSender.EmailAddress,
-			accountSender.Sender.Name,
-			emailInfo.RecipientEmail,
-			payload.Subject, // Subject and Body are shared
-			payload.Body,
-			payload.AliyunTagName,
-			true, // Enable ClickTrace
-		)
-
-		// Update the record based on the sending result.
-		if err != nil {
-			errMsg := err.Error()
-			if updateErr := s.recordRepo.UpdateStatus(emailInfo.RecordID, model.RecordStatusFailed, "", &errMsg); updateErr != nil {
-				// Log both errors.
-				_ = fmt.Errorf("worker: send failed for record %d (err: %s), and status update failed (err: %s)",
-					emailInfo.RecordID, err, updateErr)
-			}
-			// Continue to the next email, don't return.
-		} else {
-			var aliyunRequestID string
-			if requestID != nil {
-				aliyunRequestID = *requestID
-			}
-			if updateErr := s.recordRepo.UpdateStatus(emailInfo.RecordID, model.RecordStatusSent, aliyunRequestID, nil); updateErr != nil {
-				_ = fmt.Errorf("worker: send successful for record %d, but status update failed: %w", emailInfo.RecordID, updateErr)
-			}
-		}
+		return err // Return the original sending error
 	}
 
-	return nil // Return nil because individual errors are handled and logged within the loop.
+	var aliyunRequestID string
+	if requestID != nil {
+		aliyunRequestID = *requestID
+	}
+
+	if updateErr := s.recordRepo.UpdateStatus(payload.RecordID, model.RecordStatusSent, aliyunRequestID, nil); updateErr != nil {
+		return fmt.Errorf("worker: failed to update final status for record %d: %w", payload.RecordID, updateErr)
+	}
+
+	return nil
 }

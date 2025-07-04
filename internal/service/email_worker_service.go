@@ -69,19 +69,14 @@ func (w *EmailWorkerService) processTask(ctx context.Context, workerID int) {
 		return
 	}
 
-	if len(payload.Emails) == 0 {
-		log.Printf("[Worker %d] Received job with no emails to process. Skipping.", workerID)
-		return
-	}
+	log.Printf("[Worker %d] Processing email task for record ID: %d", workerID, payload.RecordID)
 
-	log.Printf("[Worker %d] Processing job with %d emails, for sender %s.", workerID, len(payload.Emails), payload.AccountSender.EmailAddress)
-
-	// Process the email batch. This is where the actual sending happens.
+	// Process the email. This is where the actual sending happens.
 	if err := w.emailProcessor.ProcessEmailJob(&payload); err != nil {
-		log.Printf("[Worker %d] Error processing email batch for sender %s: %v", workerID, payload.AccountSender.EmailAddress, err)
+		log.Printf("[Worker %d] Error processing email for record ID %d: %v", workerID, payload.RecordID, err)
 		// Implement retry logic or move to a dead-letter queue if necessary.
 		// For now, we just log the error.
 	} else {
-		log.Printf("[Worker %d] Successfully processed job with %d emails for sender %s.", workerID, len(payload.Emails), payload.AccountSender.EmailAddress)
+		log.Printf("[Worker %d] Successfully processed email task for record ID: %d", workerID, payload.RecordID)
 	}
 }
