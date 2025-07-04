@@ -20,7 +20,7 @@ type RecipientGroupService interface {
 	AddMembersToStaticGroup(groupID int64, recipientIDs []int64) error
 	RemoveMembersFromStaticGroup(groupID int64, recipientIDs []int64) error
 
-	ResolveRecipients(groupID int64, page, pageSize int) ([]*model.Recipient, error)
+	ResolveRecipients(groupID int64, searchAfter []interface{}, pageSize int) ([]*model.Recipient, []interface{}, error)
 	PreviewDynamicGroup(rules []model.RecipientGroupRule) (int64, error)
 }
 
@@ -119,30 +119,44 @@ func (s *recipientGroupService) RemoveMembersFromStaticGroup(groupID int64, reci
 
 // ResolveRecipients is the core engine that gets the final recipient list for a task.
 // It now supports pagination to handle large recipient groups efficiently.
-func (s *recipientGroupService) ResolveRecipients(groupID int64, page, pageSize int) ([]*model.Recipient, error) {
+func (s *recipientGroupService) ResolveRecipients(groupID int64, searchAfter []interface{}, pageSize int) ([]*model.Recipient, []interface{}, error) {
 	group, err := s.groupRepo.FindByID(groupID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("recipient group with id %d not found", groupID)
+			return nil, nil, fmt.Errorf("recipient group with id %d not found", groupID)
 		}
-		return nil, fmt.Errorf("failed to retrieve group %d: %w", groupID, err)
+		return nil, nil, fmt.Errorf("failed to retrieve group %d: %w", groupID, err)
 	}
 
 	if group.GroupType == "static" {
-		// For static groups, we need to fetch the members separately with pagination.
-		return s.recipientRepo.FindByGroupID(groupID, page, pageSize)
+		// TODO: Static groups currently use offset-based pagination which has limitations at scale.
+		// A more robust solution would involve keyset pagination on the SQL database.
+		// For now, we adapt the searchAfter (page number) for compatibility.
+		page := 1
+		if sa, ok := searchAfter[0].(float64); ok {
+			page = int(sa)
+		}
+		recipients, err := s.recipientRepo.FindByGroupID(groupID, page, pageSize)
+		if err != nil {
+			return nil, nil, err
+		}
+		var nextSearchAfter []interface{}
+		if len(recipients) > 0 {
+			nextSearchAfter = []interface{}{float64(page + 1)}
+		}
+		return recipients, nextSearchAfter, nil
 	}
 
 	if group.GroupType == "dynamic" {
 		if len(group.Rules) == 0 {
 			// A dynamic group with no rules should return no one.
-			return []*model.Recipient{}, nil
+			return []*model.Recipient{}, nil, nil
 		}
-		// The magic happens here: resolving recipients based on stored rules with pagination.
-		return s.groupRepo.FindRecipientsByRules(group.Rules, page, pageSize)
+		// The magic happens here: resolving recipients based on stored rules with search_after pagination.
+		return s.groupRepo.FindRecipientsByRules(group.Rules, searchAfter, pageSize)
 	}
 
-	return nil, fmt.Errorf("unknown group type '%s' for group %d", group.GroupType, groupID)
+	return nil, nil, fmt.Errorf("unknown group type '%s' for group %d", group.GroupType, groupID)
 }
 
 // PreviewDynamicGroup returns the count of recipients that match a given set of rules.

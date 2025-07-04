@@ -48,8 +48,8 @@ func (r *emailTaskRepository) FindByID(id int64) (*model.EmailTask, error) {
 	var task model.EmailTask
 	// The direct `Recipients` relation is deprecated in favor of RecipientGroupID.
 	// The recipients will be resolved by the RecipientGroupService.
+	// We no longer preload AccountSender as it's determined dynamically by the LoadBalancer.
 	err := r.db.
-		Preload("AccountSender").
 		First(&task, id).Error
 	return &task, err
 }

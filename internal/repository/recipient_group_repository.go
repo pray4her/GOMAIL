@@ -26,7 +26,7 @@ type RecipientGroupRepository interface {
 	RemoveMembers(groupID int64, recipientIDs []int64) error
 
 	// Methods for resolving dynamic groups
-	FindRecipientsByRules(rules []model.RecipientGroupRule, page, pageSize int) ([]*model.Recipient, error)
+	FindRecipientsByRules(rules []model.RecipientGroupRule, searchAfter []interface{}, pageSize int) ([]*model.Recipient, []interface{}, error)
 	CountByRules(rules []model.RecipientGroupRule) (int64, error)
 }
 
@@ -178,24 +178,35 @@ func (r *recipientGroupRepository) CountByRules(rules []model.RecipientGroupRule
 	return esResponse.Count, nil
 }
 
-// FindRecipientsByRules dynamically builds and executes a query against Elasticsearch with pagination.
-func (r *recipientGroupRepository) FindRecipientsByRules(rules []model.RecipientGroupRule, page, pageSize int) ([]*model.Recipient, error) {
-	if len(rules) == 0 {
-		return []*model.Recipient{}, nil
+// FindRecipientsByRules dynamically builds and executes a query against Elasticsearch using the search_after parameter for deep pagination.
+func (r *recipientGroupRepository) FindRecipientsByRules(rules []model.RecipientGroupRule, searchAfter []interface{}, pageSize int) ([]*model.Recipient, []interface{}, error) {
+	if pageSize <= 0 {
+		pageSize = 1000 // Default page size
 	}
 
 	queryPart, err := r.buildESQuery(rules)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	offset := (page - 1) * pageSize
-	query := fmt.Sprintf(`{
-		"query": %s,
-		"_source": ["recipient_id"],
-		"from": %d,
-		"size": %d
-	}`, queryPart, offset, pageSize)
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString(`{`)
+	queryBuilder.WriteString(fmt.Sprintf(`"query": %s,`, queryPart))
+	queryBuilder.WriteString(`"_source": ["recipient_id"],`)
+	queryBuilder.WriteString(fmt.Sprintf(`"size": %d,`, pageSize))
+	// Use recipient_id for a stable and unique sort order.
+	queryBuilder.WriteString(`"sort": [{"recipient_id": "asc"}]`)
+
+	if len(searchAfter) > 0 {
+		searchAfterJSON, err := json.Marshal(searchAfter)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal search_after values: %w", err)
+		}
+		queryBuilder.WriteString(fmt.Sprintf(`, "search_after": %s`, string(searchAfterJSON)))
+	}
+
+	queryBuilder.WriteString(`}`)
+	query := queryBuilder.String()
 
 	// Execute the search request
 	res, err := r.es.Search(
@@ -204,12 +215,12 @@ func (r *recipientGroupRepository) FindRecipientsByRules(rules []model.Recipient
 		r.es.Search.WithBody(strings.NewReader(query)),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("elasticsearch search failed: %w", err)
+		return nil, nil, fmt.Errorf("elasticsearch search failed: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, fmt.Errorf("elasticsearch search returned an error: %s", res.String())
+		return nil, nil, fmt.Errorf("elasticsearch search returned an error: %s", res.String())
 	}
 
 	// Decode the response
@@ -219,28 +230,32 @@ func (r *recipientGroupRepository) FindRecipientsByRules(rules []model.Recipient
 				Source struct {
 					RecipientID int64 `json:"recipient_id"`
 				} `json:"_source"`
+				Sort []interface{} `json:"sort"`
 			} `json:"hits"`
 		} `json:"hits"`
 	}
 
 	if err := json.NewDecoder(res.Body).Decode(&esResponse); err != nil {
-		return nil, fmt.Errorf("failed to decode elasticsearch response: %w", err)
+		return nil, nil, fmt.Errorf("failed to decode elasticsearch response: %w", err)
 	}
 
-	// Extract IDs and fetch full recipient data from PostgreSQL (Source of Truth)
+	// Extract IDs and fetch full recipient data from PostgreSQL
+	if len(esResponse.Hits.Hits) == 0 {
+		return []*model.Recipient{}, nil, nil
+	}
+
 	var recipientIDs []int64
 	for _, hit := range esResponse.Hits.Hits {
 		recipientIDs = append(recipientIDs, hit.Source.RecipientID)
 	}
 
-	if len(recipientIDs) == 0 {
-		return []*model.Recipient{}, nil
-	}
-
 	var recipients []*model.Recipient
 	if err := r.db.Where("id IN ?", recipientIDs).Find(&recipients).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch recipients from db after es search: %w", err)
+		return nil, nil, fmt.Errorf("failed to fetch recipients from db after es search: %w", err)
 	}
 
-	return recipients, nil
+	// Get the sort value from the last document to use for the next page
+	nextSearchAfter := esResponse.Hits.Hits[len(esResponse.Hits.Hits)-1].Sort
+
+	return recipients, nextSearchAfter, nil
 }

@@ -139,35 +139,75 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 		return
 	}
 
-	// === STREAMING REFACTOR: Process recipients in pages ===
-	const pageSize = 10000 // Process 10,000 recipients per batch
-	for page := 1; ; page++ {
-		log.Printf("Processing page %d for task %d...", page, task.ID)
+	// === Optimization: Fetch constant data once before the loop ===
+	group, err := s.groupService.GetGroup(*task.RecipientGroupID)
+	if err != nil {
+		log.Printf("CRITICAL: Failed to get recipient group %d for task %d: %v. Aborting dispatch.", *task.RecipientGroupID, task.ID, err)
+		return
+	}
 
-		recipients, err := s.groupService.ResolveRecipients(*task.RecipientGroupID, page, pageSize)
+	var subjectTpl, bodyTpl *template.Template
+	if task.TemplateID != nil {
+		templateModel, err := s.templateRepo.FindByID(*task.TemplateID)
 		if err != nil {
-			log.Printf("CRITICAL: Failed to resolve recipients page %d for group %d (Task %d): %v. Aborting task.", page, *task.RecipientGroupID, task.ID, err)
+			log.Printf("CRITICAL: Failed to load template ID %d for task %d, aborting dispatch: %v", *task.TemplateID, task.ID, err)
+			return
+		}
+		subjectTpl, _ = template.New("subject").Parse(templateModel.Subject)
+		bodyTpl, _ = template.New("body").Parse(templateModel.Body)
+	} else {
+		subjectStr, bodyStr := "", ""
+		if task.Subject != nil {
+			subjectStr = *task.Subject
+		}
+		if task.Body != nil {
+			bodyStr = *task.Body
+		}
+		subjectTpl, _ = template.New("subject").Parse(subjectStr)
+		bodyTpl, _ = template.New("body").Parse(bodyStr)
+	}
+	var aliyunTagName string
+	if task.AliyunTagName != nil {
+		aliyunTagName = *task.AliyunTagName
+	}
+	// === End Optimization ===
+
+	// === STREAMING REFACTOR: Process recipients in pages using search_after ===
+	const pageSize = 10000 // Process 10,000 recipients per batch
+	var searchAfter []interface{}
+	var pageCount = 0
+
+	for {
+		pageCount++
+		log.Printf("Processing page %d for task %d...", pageCount, task.ID)
+
+		recipients, nextSearchAfter, err := s.groupService.ResolveRecipients(group.ID, searchAfter, pageSize)
+		if err != nil {
+			log.Printf("CRITICAL: Failed to resolve recipients for page %d for group %d (Task %d): %v. Aborting task.", pageCount, group.ID, task.ID, err)
 			return // Abort on recipient resolution failure
 		}
+
 		if len(recipients) == 0 {
 			log.Printf("Finished processing all pages for task %d.", task.ID)
 			break // This was the last page
 		}
+		// Update searchAfter for the next iteration
+		searchAfter = nextSearchAfter
 
-		log.Printf("Page %d for task %d resolved to %d recipients. Generating dispatch plan...", page, task.ID, len(recipients))
+		log.Printf("Page %d for task %d resolved to %d recipients. Generating dispatch plan...", pageCount, task.ID, len(recipients))
 
 		// === Load Balancing Logic for the current page ===
 		plan, err := s.loadBalancer.GenerateDispatchPlan(task.CreatedByUserID, len(recipients))
 		if err != nil {
-			log.Printf("CRITICAL: Failed to generate dispatch plan for page %d of task %d: %v. Skipping page.", page, task.ID, err)
+			log.Printf("CRITICAL: Failed to generate dispatch plan for page %d of task %d: %v. Skipping page.", pageCount, task.ID, err)
 			continue // Skip to next page
 		}
 
 		if !plan.Possible || plan.TotalEmails == 0 {
-			log.Printf("Could not dispatch page %d of task %d. Requested %d emails, but plan allows for %d. Insufficient quota or no active senders.", page, task.ID, len(recipients), plan.TotalEmails)
+			log.Printf("Could not dispatch page %d of task %d. Requested %d emails, but plan allows for %d. Insufficient quota or no active senders.", pageCount, task.ID, len(recipients), plan.TotalEmails)
 			continue // Skip to next page
 		}
-		log.Printf("Dispatch plan for page %d of task %d generated: %d emails to be sent using %d senders.", page, task.ID, plan.TotalEmails, len(plan.Assignments))
+		log.Printf("Dispatch plan for page %d of task %d generated: %d emails to be sent using %d senders.", pageCount, task.ID, plan.TotalEmails, len(plan.Assignments))
 
 		// Step 1: Pre-fetch all sender details in one go
 		senderIDs := make([]int64, 0, len(plan.Assignments))
@@ -176,7 +216,7 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 		}
 		senderDetails, err := s.senderRepo.FindAccountSenderDetailsByIDs(senderIDs)
 		if err != nil {
-			log.Printf("CRITICAL: Failed to pre-fetch sender details for page %d of task %d: %v. Skipping page.", page, task.ID, err)
+			log.Printf("CRITICAL: Failed to pre-fetch sender details for page %d of task %d: %v. Skipping page.", pageCount, task.ID, err)
 			continue
 		}
 		senderMap := make(map[int64]model.AccountSender, len(senderDetails))
@@ -184,40 +224,12 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 			senderMap[sender.ID] = sender
 		}
 
-		var subjectTpl, bodyTpl *template.Template
-		if task.TemplateID != nil {
-			templateModel, err := s.templateRepo.FindByID(*task.TemplateID)
-			if err != nil {
-				log.Printf("Failed to load template ID %d for task %d, aborting dispatch: %v", *task.TemplateID, task.ID, err)
-				return // Abort processing this task if template is not found
-			}
-			subjectTpl, _ = template.New("subject").Parse(templateModel.Subject)
-			bodyTpl, _ = template.New("body").Parse(templateModel.Body)
-
-		} else {
-			// Handle ad-hoc tasks without a pre-defined template
-			subjectStr, bodyStr := "", ""
-			if task.Subject != nil {
-				subjectStr = *task.Subject
-			}
-			if task.Body != nil {
-				bodyStr = *task.Body
-			}
-			subjectTpl, _ = template.New("subject").Parse(subjectStr)
-			bodyTpl, _ = template.New("body").Parse(bodyStr)
-		}
-
-		var aliyunTagName string
-		if task.AliyunTagName != nil {
-			aliyunTagName = *task.AliyunTagName
-		}
-
 		// === Batch-oriented Dispatch Logic for the current page ===
 		recipientOffset := 0
 		for senderID, count := range plan.Assignments {
 			accountSender, ok := senderMap[senderID]
 			if !ok {
-				log.Printf("CRITICAL: Details for sender %d not found for page %d of task %d. Skipping %d emails.", senderID, page, task.ID, count)
+				log.Printf("CRITICAL: Details for sender %d not found for page %d of task %d. Skipping %d emails.", senderID, pageCount, task.ID, count)
 				recipientOffset += count // Skip the recipients for this failed sender
 				continue
 			}
@@ -225,7 +237,7 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 			// We need to use the recipients for the current page, starting from the offset
 			pageRecipients := recipients
 			if recipientOffset+count > len(pageRecipients) {
-				log.Printf("Warning: Not enough recipients on page %d for sender %d assignment. Have %d, need %d.", page, senderID, len(pageRecipients)-recipientOffset, count)
+				log.Printf("Warning: Not enough recipients on page %d for sender %d assignment. Have %d, need %d.", pageCount, senderID, len(pageRecipients)-recipientOffset, count)
 				count = len(pageRecipients) - recipientOffset
 			}
 
@@ -235,7 +247,7 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 
 				renderedSubject, renderedBody, err := s.renderTemplateForRecipient(subjectTpl, bodyTpl, recipient)
 				if err != nil {
-					log.Printf("Error rendering template for recipient %s (Task %d, Page %d): %v", recipient.Email, task.ID, page, err)
+					log.Printf("Error rendering template for recipient %s (Task %d, Page %d): %v", recipient.Email, task.ID, pageCount, err)
 					continue // Skip this recipient
 				}
 
@@ -256,12 +268,12 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 			}
 
 			if err := s.recordRepo.CreateBatch(recordsToCreate); err != nil {
-				log.Printf("CRITICAL: Failed to batch create %d records for sender %d (Task %d, Page %d): %v", len(recordsToCreate), accountSender.ID, task.ID, page, err)
+				log.Printf("CRITICAL: Failed to batch create %d records for sender %d (Task %d, Page %d): %v", len(recordsToCreate), accountSender.ID, task.ID, pageCount, err)
 				recipientOffset += count
 				continue
 			}
 
-			log.Printf("Successfully created %d records in batch for sender %d (Task %d, Page %d). Now enqueueing jobs.", len(recordsToCreate), accountSender.ID, task.ID, page)
+			log.Printf("Successfully created %d records in batch for sender %d (Task %d, Page %d). Now enqueueing jobs.", len(recordsToCreate), accountSender.ID, task.ID, pageCount)
 
 			// Enqueue a separate job for each created record.
 			for _, record := range recordsToCreate {

@@ -2060,6 +2060,9 @@ const docTemplate = `{
                 "access_key_id": {
                     "type": "string"
                 },
+                "access_key_secret": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -2171,12 +2174,6 @@ const docTemplate = `{
             "description": "Defines a task to send a specific email (or template) to a list of recipients.",
             "type": "object",
             "properties": {
-                "account_sender": {
-                    "$ref": "#/definitions/email-service_internal_model.AccountSender"
-                },
-                "account_sender_id": {
-                    "type": "integer"
-                },
                 "aliyun_tag_id": {
                     "type": "string"
                 },
@@ -2634,10 +2631,6 @@ const docTemplate = `{
                     "type": "number",
                     "example": 0.53
                 },
-                "sender_email": {
-                    "type": "string",
-                    "example": "marketing@example.com"
-                },
                 "status": {
                     "type": "string",
                     "example": "completed"
@@ -2720,15 +2713,10 @@ const docTemplate = `{
         "internal_handler.CreateEmailTaskRequest": {
             "type": "object",
             "required": [
-                "account_sender_id",
                 "recipient_group_id",
                 "task_name"
             ],
             "properties": {
-                "account_sender_id": {
-                    "type": "integer",
-                    "example": 1
-                },
                 "body": {
                     "type": "string",
                     "example": "\u003cp\u003eDear valued customer, here is a special offer just for you!\u003c/p\u003e"
