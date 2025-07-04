@@ -1,0 +1,48 @@
+server:
+  host: "localhost"
+  port: ":8080"
+  address: "localhost:8080"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "YJKJ"
+  dbname: "email_service_db"
+  sslmode: "disable"
+  dsn: "host=localhost user=postgres password=mysecretpassword dbname=email_service port=5432 sslmode=disable"
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+rabbitmq:
+  url: "amqp://guest:guest@localhost:5672/"
+
+aliyun:
+  default_region: "cn-hangzhou"
+  endpoint: "dm.aliyuncs.com"
+  access_key_id: "YOUR_ACCESS_KEY_ID"
+  access_key_secret: "YOUR_ACCESS_KEY_SECRET"
+
+jwt:
+  secret: "your-super-secret-key"
+  expire_hours: 240
+
+logging:
+  level: "debug" # debug, info, warn, error
+  format: "json" # text, json 
+
+worker:
+  email_sender_count: 10
+
+scheduler:
+  polling_interval: "10s" # e.g., 5s, 1m, 1h 
+
+elasticsearch:
+  addresses:
+    - "https://localhost:9200"
+  username: "elastic"
+  password: "gR=TRUEUASS2r7=aob+1"
+  insecure_skip_verify: true

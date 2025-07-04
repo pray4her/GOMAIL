@@ -42,4 +42,14 @@ The project follows a standard layered architecture inside the `internal` direct
 
 ## 4. Project Tracking
 - The overall project progress, roadmap, and setup instructions are documented in [README.md](mdc:email-service/README.md).
+- **Connection**: The database connection is initialized in @pkg/database/postgres.go.
 
+### d. Migration Workflow Caveat
+- **IMPORTANT**: When rolling back a faulty migration to create a new one, a specific workflow must be followed to ensure a clean history.
+- **Step 1: Rollback**. Use `migrate down` to revert the database to the state before the faulty migration (e.g., from version `N` to `N-1`).
+- **Step 2: Delete**. You **must** delete the `.up.sql` and `.down.sql` files of the faulty migration (i.e., delete the files for version `N`).
+- **Step 3: Create**. Now, create the new, correct migration. It will correctly be assigned the version number `N`.
+- **Reasoning**: Failing to delete the old files will cause `migrate up` to re-apply the faulty migration (`N`) before applying the new one (`N+1`), leading to an incorrect database state.
+
+## 4. Project Tracking
+- The overall project progress, roadmap, and setup instructions are documented in @README.md.

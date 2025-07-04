@@ -1,0 +1,1924 @@
+basePath: /
+definitions:
+  email-service_internal_model.Account:
+    description: Holds credentials and configuration for an external email service.
+    properties:
+      access_key_id:
+        type: string
+      created_at:
+        type: string
+      daily_send_limit:
+        type: integer
+      domain:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  email-service_internal_model.AccountSender:
+    description: Represents the many-to-many relationship between accounts and senders,
+      with specific sending configurations.
+    properties:
+      account:
+        $ref: '#/definitions/email-service_internal_model.Account'
+      account_id:
+        type: integer
+      created_at:
+        type: string
+      daily_send_limit:
+        type: integer
+      email_address:
+        type: string
+      id:
+        type: integer
+      sender:
+        $ref: '#/definitions/email-service_internal_model.Sender'
+      sender_id:
+        type: integer
+      status:
+        type: string
+      updated_at:
+        type: string
+      weight:
+        type: integer
+    type: object
+  email-service_internal_model.EmailSendRecord:
+    description: Logs the details and delivery status of each individual email.
+    properties:
+      account_sender:
+        $ref: '#/definitions/email-service_internal_model.AccountSender'
+      account_sender_id:
+        type: integer
+      aliyun_task_id:
+        type: string
+      body:
+        type: string
+      error_message:
+        type: string
+      id:
+        type: integer
+      last_status_update_at:
+        type: string
+      recipient_email:
+        type: string
+      sent_at:
+        type: string
+      status:
+        type: string
+      subject:
+        type: string
+      task:
+        $ref: '#/definitions/email-service_internal_model.EmailTask'
+      task_id:
+        type: integer
+    type: object
+  email-service_internal_model.EmailTask:
+    description: Defines a task to send a specific email (or template) to a list of
+      recipients.
+    properties:
+      account_sender:
+        $ref: '#/definitions/email-service_internal_model.AccountSender'
+      account_sender_id:
+        type: integer
+      aliyun_tag_id:
+        type: string
+      aliyun_tag_name:
+        description: Fields for tracking via Aliyun API
+        type: string
+      body:
+        type: string
+      clickRate:
+        type: number
+      created_at:
+        type: string
+      created_by_user:
+        $ref: '#/definitions/email-service_internal_model.User'
+      created_by_user_id:
+        type: integer
+      id:
+        type: integer
+      openRate:
+        type: number
+      priority:
+        type: integer
+      recipient_group:
+        $ref: '#/definitions/email-service_internal_model.RecipientGroup'
+      recipient_group_id:
+        type: integer
+      scheduled_at:
+        type: string
+      status:
+        type: string
+      subject:
+        type: string
+      task_name:
+        type: string
+      template:
+        $ref: '#/definitions/email-service_internal_model.EmailTemplate'
+      template_id:
+        type: integer
+      total_click_count:
+        type: integer
+      total_open_count:
+        type: integer
+      unique_click_count:
+        type: integer
+      unique_open_count:
+        type: integer
+      uniqueClickRate:
+        type: number
+      uniqueOpenRate:
+        type: number
+      updated_at:
+        type: string
+    type: object
+  email-service_internal_model.EmailTemplate:
+    description: Stores predefined subject and body for emails.
+    properties:
+      body:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      subject:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  email-service_internal_model.Recipient:
+    description: Stores information about a person who can receive emails, including
+      custom data.
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+      metadata:
+        additionalProperties:
+          type: string
+        type: object
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  email-service_internal_model.RecipientGroup:
+    description: Defines a group of recipients, which can be a fixed list (static)
+      or rule-based (dynamic).
+    properties:
+      created_at:
+        type: string
+      created_by_user:
+        $ref: '#/definitions/email-service_internal_model.User'
+      created_by_user_id:
+        type: integer
+      description:
+        type: string
+      group_type:
+        description: '''static'' or ''dynamic'''
+        type: string
+      id:
+        type: integer
+      members:
+        items:
+          $ref: '#/definitions/email-service_internal_model.Recipient'
+        type: array
+      name:
+        type: string
+      rules:
+        items:
+          $ref: '#/definitions/email-service_internal_model.RecipientGroupRule'
+        type: array
+      updated_at:
+        type: string
+    type: object
+  email-service_internal_model.RecipientGroupRule:
+    description: A rule used to dynamically include recipients in a group based on
+      their attributes.
+    properties:
+      field:
+        description: e.g., "status", "metadata.country"
+        type: string
+      group_id:
+        type: integer
+      id:
+        type: integer
+      operator:
+        description: e.g., "equals", "contains"
+        type: string
+      value:
+        type: string
+    type: object
+  email-service_internal_model.Sender:
+    description: Contains information about the sender of an email.
+    properties:
+      contact_info:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      role:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  email-service_internal_model.User:
+    description: Defines a user of this email service platform, with roles and access
+      rights.
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      is_active:
+        type: boolean
+      is_admin:
+        type: boolean
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  email-service_internal_repository.DailyStatistics:
+    properties:
+      click_count:
+        type: integer
+      click_rate:
+        type: number
+      date:
+        type: string
+      open_count:
+        type: integer
+      open_rate:
+        type: number
+      sent_count:
+        type: integer
+      unique_click_count:
+        type: integer
+      unique_click_rate:
+        type: number
+      unique_open_count:
+        type: integer
+      unique_open_rate:
+        type: number
+    type: object
+  email-service_internal_repository.OverallStatistics:
+    properties:
+      overall_click_rate:
+        type: number
+      overall_open_rate:
+        type: number
+      overall_unique_click_rate:
+        type: number
+      overall_unique_open_rate:
+        type: number
+      total_clicked:
+        type: integer
+      total_opened:
+        type: integer
+      total_sent:
+        type: integer
+      total_unique_clicked:
+        type: integer
+      total_unique_opened:
+        type: integer
+    type: object
+  email-service_internal_repository.SenderStatistics:
+    properties:
+      account_name:
+        type: string
+      account_sender_id:
+        type: integer
+      click_count:
+        type: integer
+      click_rate:
+        type: number
+      open_count:
+        type: integer
+      open_rate:
+        type: number
+      sender_email:
+        type: string
+      sender_name:
+        type: string
+      sent_count:
+        type: integer
+      unique_click_count:
+        type: integer
+      unique_click_rate:
+        type: number
+      unique_open_count:
+        type: integer
+      unique_open_rate:
+        type: number
+    type: object
+  email-service_internal_service.PreviewData:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+    type: object
+  email-service_internal_service.RenderedTemplate:
+    properties:
+      body:
+        type: string
+      subject:
+        type: string
+    type: object
+  email-service_internal_service.StatisticsPeriod:
+    properties:
+      days:
+        type: integer
+      end_date:
+        type: string
+      start_date:
+        type: string
+    type: object
+  email-service_internal_service.StatisticsResponse:
+    properties:
+      by_sender:
+        items:
+          $ref: '#/definitions/email-service_internal_repository.SenderStatistics'
+        type: array
+      period:
+        $ref: '#/definitions/email-service_internal_service.StatisticsPeriod'
+      summary:
+        $ref: '#/definitions/email-service_internal_repository.OverallStatistics'
+      time_series:
+        items:
+          $ref: '#/definitions/email-service_internal_repository.DailyStatistics'
+        type: array
+    type: object
+  email-service_internal_service.TaskSummary:
+    description: Provides a high-level overview of an email task's performance.
+    properties:
+      click_count:
+        example: 250
+        type: integer
+      click_rate:
+        example: 0.16
+        type: number
+      created_at:
+        example: "2023-10-26 10:00:00"
+        type: string
+      id:
+        example: 1
+        type: integer
+      open_count:
+        example: 800
+        type: integer
+      open_rate:
+        example: 0.53
+        type: number
+      sender_email:
+        example: marketing@example.com
+        type: string
+      status:
+        example: completed
+        type: string
+      task_name:
+        example: Q3 Newsletter
+        type: string
+      total_recipients:
+        example: 1500
+        type: integer
+      unique_click_count:
+        example: 200
+        type: integer
+      unique_click_rate:
+        example: 0.13
+        type: number
+      unique_open_count:
+        example: 600
+        type: integer
+      unique_open_rate:
+        example: 0.4
+        type: number
+    type: object
+  internal_handler.AddSenderToAccountRequest:
+    properties:
+      daily_send_limit:
+        example: 1000
+        type: integer
+      email_address:
+        example: noreply@example.com
+        type: string
+    required:
+    - daily_send_limit
+    - email_address
+    type: object
+  internal_handler.CreateAccountRequest:
+    description: Request body for creating a new Aliyun email account.
+    properties:
+      access_key_id:
+        example: LTAI5txxxxxxxxxxxxxx
+        type: string
+      access_key_secret:
+        example: P1aXxxxxxxxxxxxxxxxxxxxxxx
+        type: string
+      daily_send_limit:
+        example: 5000
+        type: integer
+      domain:
+        example: mail.example.com
+        type: string
+      name:
+        example: Aliyun Account 1
+        type: string
+    required:
+    - access_key_id
+    - access_key_secret
+    - domain
+    - name
+    type: object
+  internal_handler.CreateEmailTaskRequest:
+    properties:
+      account_sender_id:
+        example: 1
+        type: integer
+      body:
+        example: <p>Dear valued customer, here is a special offer just for you!</p>
+        type: string
+      recipient_group_id:
+        example: 5
+        minimum: 1
+        type: integer
+      scheduled_at:
+        example: "2025-01-01T12:00:00Z"
+        format: date-time
+        type: string
+      subject:
+        example: Special Offer Inside!
+        type: string
+      task_name:
+        example: Q4 Promotion
+        type: string
+      template_id:
+        example: 10
+        type: integer
+    required:
+    - account_sender_id
+    - recipient_group_id
+    - task_name
+    type: object
+  internal_handler.CreateGroupRequest:
+    properties:
+      description:
+        type: string
+      group_type:
+        enum:
+        - static
+        - dynamic
+        type: string
+      member_ids:
+        items:
+          type: integer
+        type: array
+      name:
+        type: string
+      rules:
+        items:
+          $ref: '#/definitions/email-service_internal_model.RecipientGroupRule'
+        type: array
+    required:
+    - group_type
+    - name
+    type: object
+  internal_handler.CreateRecipientRequest:
+    properties:
+      email:
+        example: john.doe@example.com
+        type: string
+      first_name:
+        example: John
+        type: string
+      last_name:
+        example: Doe
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+    required:
+    - email
+    type: object
+  internal_handler.CreateTemplateRequest:
+    description: Request body for creating a new email template.
+    properties:
+      body:
+        example: <h1>Hello {{.FirstName}}!</h1><p>Thank you for joining us.</p>
+        type: string
+      name:
+        example: Welcome Email
+        type: string
+      subject:
+        example: Welcome to Our Service!
+        type: string
+    required:
+    - body
+    - name
+    - subject
+    type: object
+  internal_handler.ModifyMembersRequest:
+    properties:
+      member_ids:
+        items:
+          type: integer
+        type: array
+    required:
+    - member_ids
+    type: object
+  internal_handler.PaginatedResponse:
+    properties:
+      data: {}
+      pagination:
+        $ref: '#/definitions/internal_handler.Pagination'
+    type: object
+  internal_handler.Pagination:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  internal_handler.Response:
+    properties:
+      data: {}
+      error:
+        type: string
+    type: object
+  internal_handler.SendEmailRequest:
+    properties:
+      account_sender_id:
+        example: 1
+        type: integer
+      html_body:
+        example: <p>Hello, this is a test email.</p>
+        type: string
+      subject:
+        example: A Quick Message
+        type: string
+      to_address:
+        example: test.recipient@example.com
+        type: string
+    required:
+    - account_sender_id
+    - html_body
+    - subject
+    - to_address
+    type: object
+  internal_handler.UpdateGroupRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      rules:
+        items:
+          $ref: '#/definitions/email-service_internal_model.RecipientGroupRule'
+        type: array
+    required:
+    - name
+    type: object
+  internal_handler.UpdateRecipientRequest:
+    properties:
+      email:
+        example: john.doe.updated@example.com
+        type: string
+      first_name:
+        example: Johnathan
+        type: string
+      last_name:
+        example: Doe
+        type: string
+      metadata:
+        additionalProperties: true
+        type: object
+      status:
+        example: unsubscribed
+        type: string
+    type: object
+  internal_handler.UpdateTemplateRequest:
+    description: Request body for updating an existing email template.
+    properties:
+      body:
+        example: <h2>Hello {{.FirstName}}!</h2><p>We are thrilled to have you.</p>
+        type: string
+      name:
+        example: Welcome Email V2
+        type: string
+      subject:
+        example: A Warm Welcome to Our Service!
+        type: string
+    type: object
+  internal_handler.createUserRequest:
+    properties:
+      email:
+        example: new.user@example.com
+        type: string
+      is_admin:
+        example: false
+        type: boolean
+      password:
+        example: strongpassword
+        minLength: 8
+        type: string
+      username:
+        example: newuser
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  internal_handler.loginRequest:
+    properties:
+      password:
+        example: password123
+        type: string
+      username:
+        example: admin
+        type: string
+    required:
+    - password
+    - username
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: email-service/internal/handler
+    url: http://www.swagger.io/support
+  description: This is a powerful email service API for batch sending and management.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Go Email Service API
+  version: "1.0"
+paths:
+  /api/v1/accounts:
+    get:
+      description: Retrieves a list of all configured email service provider accounts.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/email-service_internal_model.Account'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get All Accounts
+      tags:
+      - Accounts
+    post:
+      consumes:
+      - application/json
+      description: Adds a new third-party email service provider account.
+      parameters:
+      - description: Account Details
+        in: body
+        name: account
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.CreateAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.Account'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create Account
+      tags:
+      - Accounts
+  /api/v1/accounts/{id}:
+    delete:
+      description: Deletes an account by its ID.
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Account deleted successfully'
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
+        "400":
+          description: Invalid account ID
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Account
+      tags:
+      - Accounts
+    get:
+      description: Retrieves the details of a specific account by its ID.
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.Account'
+              type: object
+        "400":
+          description: Invalid account ID
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Account by ID
+      tags:
+      - Accounts
+    put:
+      consumes:
+      - application/json
+      description: Updates the details of an existing account. The request body should
+        contain the full account object.
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Account object with updated details
+        in: body
+        name: account
+        required: true
+        schema:
+          $ref: '#/definitions/email-service_internal_model.Account'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.Account'
+              type: object
+        "400":
+          description: Invalid account ID or request body
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update Account
+      tags:
+      - Accounts
+  /api/v1/emails/send:
+    post:
+      consumes:
+      - application/json
+      description: Queues a single, non-template email for immediate sending. This
+        is suitable for transactional emails.
+      parameters:
+      - description: Email Details
+        in: body
+        name: email
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.SendEmailRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: 'message: Email queued for sending, record_id: 12345'
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Send Single Email
+      tags:
+      - Emails
+  /api/v1/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns a JWT token.
+      parameters:
+      - description: User credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"token": "..."}'
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "401":
+          description: Invalid credentials
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      summary: User login
+      tags:
+      - Auth
+  /api/v1/recipient-groups:
+    get:
+      description: Retrieves a paginated list of all recipient groups.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of groups
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/email-service_internal_model.RecipientGroup'
+                  type: array
+              type: object
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: List recipient groups
+      tags:
+      - Recipient Groups
+    post:
+      consumes:
+      - application/json
+      description: Creates either a static or a dynamic recipient group. For static
+        groups, provide member_ids. For dynamic groups, provide rules.
+      parameters:
+      - description: Group Creation Request
+        in: body
+        name: group
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.CreateGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Successfully created group
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.RecipientGroup'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a recipient group
+      tags:
+      - Recipient Groups
+  /api/v1/recipient-groups/{id}:
+    delete:
+      description: Deletes a recipient group and its associations.
+      parameters:
+      - description: Group ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Successfully deleted group
+        "400":
+          description: Invalid group ID
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Group not found
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a recipient group
+      tags:
+      - Recipient Groups
+    get:
+      description: Retrieves details of a specific recipient group by its ID.
+      parameters:
+      - description: Group ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Group details
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.RecipientGroup'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Group not found
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a recipient group
+      tags:
+      - Recipient Groups
+    put:
+      consumes:
+      - application/json
+      description: Updates a recipient group's details. For dynamic groups, rules
+        can be updated.
+      parameters:
+      - description: Group ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Group Update Request
+        in: body
+        name: group
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.UpdateGroupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully updated group
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.RecipientGroup'
+              type: object
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Group not found
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a recipient group
+      tags:
+      - Recipient Groups
+  /api/v1/recipient-groups/{id}/members:
+    delete:
+      consumes:
+      - application/json
+      description: Removes a list of recipients from a static group.
+      parameters:
+      - description: Group ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Members to Remove
+        in: body
+        name: members
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.ModifyMembersRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully removed members
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Group not found
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Remove members from a static group
+      tags:
+      - Recipient Groups
+    post:
+      consumes:
+      - application/json
+      description: Adds a list of recipients to a static group.
+      parameters:
+      - description: Group ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Members to Add
+        in: body
+        name: members
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.ModifyMembersRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully added members
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "400":
+          description: Invalid request body or parameters
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Group not found
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Add members to a static group
+      tags:
+      - Recipient Groups
+  /api/v1/recipients:
+    get:
+      description: Retrieves a paginated list of all recipients.
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Number of items per page (default: 10)'
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.PaginatedResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/email-service_internal_model.Recipient'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: List Recipients
+      tags:
+      - Recipients
+    post:
+      consumes:
+      - application/json
+      description: Adds a new recipient to the system.
+      parameters:
+      - description: Recipient Information
+        in: body
+        name: recipient
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.CreateRecipientRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.Recipient'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create Recipient
+      tags:
+      - Recipients
+  /api/v1/recipients/{id}:
+    delete:
+      description: Deletes a recipient from the system.
+      parameters:
+      - description: Recipient ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid recipient ID
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Recipient
+      tags:
+      - Recipients
+    get:
+      description: Retrieves details for a specific recipient.
+      parameters:
+      - description: Recipient ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.Recipient'
+              type: object
+        "400":
+          description: Invalid recipient ID
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Recipient not found
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Recipient by ID
+      tags:
+      - Recipients
+    put:
+      consumes:
+      - application/json
+      description: Updates the details of an existing recipient.
+      parameters:
+      - description: Recipient ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Recipient fields to update
+        in: body
+        name: recipient
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.UpdateRecipientRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.Recipient'
+              type: object
+        "400":
+          description: Invalid recipient ID or request body
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update Recipient
+      tags:
+      - Recipients
+  /api/v1/senders:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new sender entity (e.g., a person or department).
+      parameters:
+      - description: Sender Information
+        in: body
+        name: sender
+        required: true
+        schema:
+          $ref: '#/definitions/email-service_internal_model.Sender'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.Sender'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create Sender
+      tags:
+      - Senders
+  /api/v1/senders/{senderId}/accounts/{accountId}:
+    post:
+      consumes:
+      - application/json
+      description: Associates a sender with an account, creating a usable 'from' email
+        address with a specific sending limit.
+      parameters:
+      - description: Account ID
+        in: path
+        name: accountId
+        required: true
+        type: integer
+      - description: Sender ID
+        in: path
+        name: senderId
+        required: true
+        type: integer
+      - description: Association Details
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.AddSenderToAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.AccountSender'
+              type: object
+        "400":
+          description: Invalid ID or request body
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Failed to associate sender with account
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Add Sender to Account
+      tags:
+      - Senders
+  /api/v1/statistics:
+    get:
+      description: |-
+        Get comprehensive email sending statistics with various filters and grouping options.
+        Provides overall summary, time series data, and sender performance analysis.
+      parameters:
+      - description: Start date (YYYY-MM-DD format)
+        example: "2023-10-01"
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD format)
+        example: "2023-10-31"
+        in: query
+        name: end_date
+        type: string
+      - description: Filter by specific account ID
+        example: 1
+        in: query
+        name: account_id
+        type: integer
+      - description: Filter by specific sender ID
+        example: 1
+        in: query
+        name: account_sender_id
+        type: integer
+      - description: 'Group results by: day, week, month, sender'
+        enum:
+        - day
+        - week
+        - month
+        - sender
+        example: day
+        in: query
+        name: group_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The data field contains the comprehensive statistics
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_service.StatisticsResponse'
+              type: object
+        "400":
+          description: Invalid request parameters
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Multi-Dimensional Statistics
+      tags:
+      - Statistics
+  /api/v1/tasks:
+    post:
+      consumes:
+      - application/json
+      description: Creates and queues a new task to send emails to a list of recipients.
+        Either a template_id or a subject/body pair must be provided. This endpoint
+        is asynchronous and will return a task ID upon successful queuing.
+      parameters:
+      - description: Batch Task Details
+        in: body
+        name: task
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.CreateEmailTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: 'message: Email task created..., task_id: 123'
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "401":
+          description: Unauthorized - User not authenticated
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "403":
+          description: Forbidden - User does not have permission to use the specified
+            sender
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create Batch Email Task
+      tags:
+      - Tasks
+  /api/v1/tasks/{id}:
+    get:
+      description: Get a summary of sending statistics for a specific task.
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: The data field will contain the task summary
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_service.TaskSummary'
+              type: object
+        "400":
+          description: Invalid Task ID
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Task Summary
+      tags:
+      - Statistics
+  /api/v1/tasks/{id}/records:
+    get:
+      description: Get a detailed list of all email send records for a specific task.
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/email-service_internal_model.EmailSendRecord'
+                  type: array
+              type: object
+        "400":
+          description: Invalid Task ID
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Task not found or no records for this task
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Task Records
+      tags:
+      - Statistics
+  /api/v1/templates:
+    get:
+      description: Retrieves a list of all email templates.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/email-service_internal_model.EmailTemplate'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get All Templates
+      tags:
+      - Templates
+    post:
+      consumes:
+      - application/json
+      description: Creates a new email template.
+      parameters:
+      - description: Template Details
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.CreateTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.EmailTemplate'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create Template
+      tags:
+      - Templates
+  /api/v1/templates/{id}:
+    delete:
+      description: Deletes an email template by its ID.
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Template deleted successfully'
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
+        "400":
+          description: Invalid template ID
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Template
+      tags:
+      - Templates
+    get:
+      description: Retrieves a specific email template by its ID.
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.EmailTemplate'
+              type: object
+        "400":
+          description: Invalid template ID
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Template not found
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Template by ID
+      tags:
+      - Templates
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing email template.
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Updated Template Details
+        in: body
+        name: template
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.UpdateTemplateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.EmailTemplate'
+              type: object
+        "400":
+          description: Invalid template ID or request body
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update Template
+      tags:
+      - Templates
+  /api/v1/templates/{id}/preview:
+    post:
+      consumes:
+      - application/json
+      description: Renders a preview of a template with sample data.
+      parameters:
+      - description: Template ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Sample data for preview
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/email-service_internal_service.PreviewData'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_service.RenderedTemplate'
+              type: object
+        "400":
+          description: Invalid template ID or request body
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "404":
+          description: Template not found
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Preview Template
+      tags:
+      - Templates
+  /api/v1/users:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account. This is a protected endpoint.
+      parameters:
+      - description: User details
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/internal_handler.createUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Successfully created user
+          schema:
+            allOf:
+            - $ref: '#/definitions/internal_handler.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/email-service_internal_model.User'
+              type: object
+        "400":
+          description: Invalid request body
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "409":
+          description: User with this username or email already exists
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/internal_handler.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new user
+      tags:
+      - Users
+securityDefinitions:
+  ApiKeyAuth:
+    description: Type "Bearer" followed by a space and a JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
