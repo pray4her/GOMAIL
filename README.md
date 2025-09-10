@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 企业级多账号邮件群发管理系统
 
 本项目是一个基于 Go 语言和阿里云邮件推送服务的企业级邮件群发系统。
@@ -208,3 +209,7 @@
     b. **登录**: 使用您创建的用户名和密码，调用 `POST http://localhost:8080/api/v1/login` 来获取 JWT Token。
     c. **调用受保护接口**: 在请求其他API时，请在请求头中加入 `Authorization` 字段，值为 `Bearer <YOUR_TOKEN>`。
     d. **授予权限**: 若要使用发件人创建任务，需在 `user_permissions` 表中手动插入记录，将 `user_id` 和 `account_sender_id` 进行关联。 
+=======
+# GO-
+邮件群发的后端系统，采用go编写，redis和rabbitmq作为消息队列，jwt加密，elasticsearch作为邮件索引
+>>>>>>> e2cac0d0461b1adf34d3e5cebe0970f671685037
