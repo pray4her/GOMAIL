@@ -6,6 +6,7 @@ import (
 	"email-service/internal/service"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,12 +28,57 @@ type EmailTaskCreator interface {
 
 // EmailTaskHandler handles HTTP requests for email tasks.
 type EmailTaskHandler struct {
-	service EmailTaskCreator
+	service service.EmailTaskServiceInterface
 }
 
 // NewEmailTaskHandler creates a new EmailTaskHandler.
-func NewEmailTaskHandler(service EmailTaskCreator) *EmailTaskHandler {
+func NewEmailTaskHandler(service service.EmailTaskServiceInterface) *EmailTaskHandler {
 	return &EmailTaskHandler{service: service}
+}
+
+// ListTasksResponse defines the successful response structure for listing tasks.
+type ListTasksResponse struct {
+	Tasks      []model.EmailTask `json:"tasks"`
+	Pagination Pagination        `json:"pagination"`
+}
+
+// ListTasks handles the API endpoint for listing all email tasks with pagination.
+// @Summary      List Email Tasks
+// @Description  Retrieves a paginated list of all email tasks.
+// @Tags         Tasks
+// @Produce      json
+// @Param        page      query     int  false  "Page number for pagination"  default(1)
+// @Param        pageSize  query     int  false  "Number of tasks per page"    default(10)
+// @Success      200       {object}  Response{data=ListTasksResponse}
+// @Failure      400       {object}  Response  "Invalid page or pageSize parameters"
+// @Failure      500       {object}  Response  "Internal server error"
+// @Security     ApiKeyAuth
+// @Router       /api/v1/tasks [get]
+func (h *EmailTaskHandler) ListTasks(c *gin.Context) {
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, Response{Error: "Invalid page number"})
+		return
+	}
+
+	pageSize, err := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	if err != nil || pageSize < 1 {
+		c.JSON(http.StatusBadRequest, Response{Error: "Invalid page size"})
+		return
+	}
+
+	tasks, total, err := h.service.ListTasks(page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Error: "Failed to retrieve tasks"})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Data: ListTasksResponse{
+			Tasks:      tasks,
+			Pagination: NewPagination(page, pageSize, total),
+		},
+	})
 }
 
 // CreateEmailTaskRequest defines the request body for creating a new batch send task.
@@ -43,6 +89,8 @@ type CreateEmailTaskRequest struct {
 	Subject          string     `json:"subject" example:"Special Offer Inside!"`
 	Body             string     `json:"body" example:"<p>Dear valued customer, here is a special offer just for you!</p>"`
 	ScheduledAt      *time.Time `json:"scheduled_at,omitempty" format:"date-time" example:"2025-01-01T12:00:00Z"`
+	SendLimit        *int       `json:"send_limit,omitempty" example:"10000"`
+	SendOffset       *int       `json:"send_offset,omitempty" example:"0"`
 }
 
 // CreateEmailTask handles the API endpoint for creating a batch sending task.
@@ -81,6 +129,8 @@ func (h *EmailTaskHandler) CreateEmailTask(c *gin.Context) {
 		req.Subject,
 		req.Body,
 		req.ScheduledAt,
+		req.SendLimit,
+		req.SendOffset,
 	)
 	if err != nil {
 		if errors.Is(err, service.ErrPermissionDenied) {

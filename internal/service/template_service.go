@@ -26,6 +26,7 @@ type RenderedTemplate struct {
 type TemplateService interface {
 	CreateTemplate(template *model.EmailTemplate) error
 	GetTemplates() ([]model.EmailTemplate, error)
+	ListTemplates(page, pageSize int) ([]model.EmailTemplate, int64, error)
 	GetTemplateByID(id int64) (*model.EmailTemplate, error)
 	UpdateTemplate(template *model.EmailTemplate) error
 	DeleteTemplate(id int64) error
@@ -46,6 +47,10 @@ func (s *templateService) CreateTemplate(template *model.EmailTemplate) error {
 
 func (s *templateService) GetTemplates() ([]model.EmailTemplate, error) {
 	return s.repo.FindAll()
+}
+
+func (s *templateService) ListTemplates(page, pageSize int) ([]model.EmailTemplate, int64, error) {
+	return s.repo.List(page, pageSize)
 }
 
 func (s *templateService) GetTemplateByID(id int64) (*model.EmailTemplate, error) {

@@ -21,10 +21,11 @@ rabbitmq:
   url: "amqp://guest:guest@localhost:5672/"
 
 aliyun:
-  default_region: "cn-hangzhou"
-  endpoint: "dm.aliyuncs.com"
-  access_key_id: "YOUR_ACCESS_KEY_ID"
-  access_key_secret: "YOUR_ACCESS_KEY_SECRET"
+  endpoint: "dm.us-east-1.aliyuncs.com"
+  region_id: "us-east-1"
+  rate_limit:
+    rate: 3 # 每秒允许的请求数 (requests per second)
+    burst: 3 # 允许的瞬时并发数 (burst size)
 
 jwt:
   secret: "your-super-secret-key"
@@ -40,9 +41,25 @@ worker:
 scheduler:
   polling_interval: "10s" # e.g., 5s, 1m, 1h 
 
+task_recovery:
+  enabled: true
+  startup_delay: 30s
+
 elasticsearch:
   addresses:
     - "https://localhost:9200"
   username: "elastic"
   password: "gR=TRUEUASS2r7=aob+1"
   insecure_skip_verify: true
+
+file_upload:
+  max_file_size: "50MB"
+  upload_path: "./uploads/recipients/"
+  allowed_types: ["csv", "xlsx", "json"]
+
+import:
+  batch_size: 1000          # 数据库批量插入大小
+  es_batch_size: 500        # ES批量同步大小
+  max_concurrent_tasks: 3   # 最大并发导入任务数
+  enable_recovery: true     # 启用导入任务恢复
+  recovery_startup_delay: "10s" # 恢复启动延迟

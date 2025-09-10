@@ -13,6 +13,7 @@ import (
 	"email-service/internal/model"
 	"email-service/internal/queue"
 	"email-service/internal/repository"
+	"email-service/pkg/aliyun"
 )
 
 // TaskDispatcherService is responsible for dequeuing batch tasks and
@@ -24,8 +25,10 @@ type TaskDispatcherService struct {
 	groupService    RecipientGroupService
 	loadBalancer    LoadBalancerService
 	senderRepo      repository.SenderRepository
+	counterService  TaskCounterService
 	queue           queue.QueueService
 	pollingInterval time.Duration
+	aliyunEndpoint  string
 }
 
 // NewTaskDispatcherService creates a new TaskDispatcherService.
@@ -36,8 +39,10 @@ func NewTaskDispatcherService(
 	templateRepo repository.TemplateRepository,
 	groupService RecipientGroupService,
 	loadBalancer LoadBalancerService,
+	counterService TaskCounterService,
 	queueSvc queue.QueueService,
 	pollingInterval time.Duration,
+	aliyunEndpoint string,
 ) *TaskDispatcherService {
 	return &TaskDispatcherService{
 		taskRepo:        taskRepo,
@@ -46,8 +51,10 @@ func NewTaskDispatcherService(
 		templateRepo:    templateRepo,
 		groupService:    groupService,
 		loadBalancer:    loadBalancer,
+		counterService:  counterService,
 		queue:           queueSvc,
 		pollingInterval: pollingInterval,
+		aliyunEndpoint:  aliyunEndpoint,
 	}
 }
 
@@ -139,10 +146,18 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 		return
 	}
 
+	// Update task status to dispatching
+	if err := s.taskRepo.UpdateStatus(task.ID, model.TaskStatusDispatching); err != nil {
+		log.Printf("Error updating task %d status to dispatching: %v", task.ID, err)
+		return
+	}
+	log.Printf("Task %d status updated to dispatching", task.ID)
+
 	// === Optimization: Fetch constant data once before the loop ===
 	group, err := s.groupService.GetGroup(*task.RecipientGroupID)
 	if err != nil {
 		log.Printf("CRITICAL: Failed to get recipient group %d for task %d: %v. Aborting dispatch.", *task.RecipientGroupID, task.ID, err)
+		_ = s.taskRepo.UpdateStatus(task.ID, model.TaskStatusFailed)
 		return
 	}
 
@@ -151,6 +166,7 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 		templateModel, err := s.templateRepo.FindByID(*task.TemplateID)
 		if err != nil {
 			log.Printf("CRITICAL: Failed to load template ID %d for task %d, aborting dispatch: %v", *task.TemplateID, task.ID, err)
+			_ = s.taskRepo.UpdateStatus(task.ID, model.TaskStatusFailed)
 			return
 		}
 		subjectTpl, _ = template.New("subject").Parse(templateModel.Subject)
@@ -172,16 +188,72 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 	}
 	// === End Optimization ===
 
+	// === Initialize task counter and update status to processing ===
+	totalRecipientsInGroup, err := s.groupService.CountRecipients(group.ID, task.SendLimit, task.SendOffset)
+	if err != nil {
+		log.Printf("CRITICAL: Failed to count recipients for group %d (Task %d): %v. Aborting dispatch.", group.ID, task.ID, err)
+		_ = s.taskRepo.UpdateStatus(task.ID, model.TaskStatusFailed)
+		return
+	}
+
+	// The actual number of recipients for this task run is the total in the group,
+	// adjusted by the user-defined limit.
+	recipientsForThisRun := totalRecipientsInGroup
+	if task.SendLimit != nil && *task.SendLimit < totalRecipientsInGroup {
+		recipientsForThisRun = *task.SendLimit
+	}
+
+	if recipientsForThisRun == 0 {
+		log.Printf("Task %d has no recipients to process (after applying limit/offset). Completing immediately.", task.ID)
+		_ = s.taskRepo.UpdateStatus(task.ID, model.TaskStatusCompleted)
+		_ = s.taskRepo.UpdateProgress(task.ID, 0, 0)
+		return
+	}
+
+	// Initialize Redis counter with the actual number for this run
+	if err := s.counterService.InitializeTaskCounter(task.ID, recipientsForThisRun); err != nil {
+		log.Printf("CRITICAL: Failed to initialize counter for task %d: %v. Aborting dispatch.", task.ID, err)
+		_ = s.taskRepo.UpdateStatus(task.ID, model.TaskStatusFailed)
+		return
+	}
+
+	// Update task status to processing and set total recipients
+	if err := s.taskRepo.UpdateStatus(task.ID, model.TaskStatusProcessing); err != nil {
+		log.Printf("Error updating task %d status to processing: %v", task.ID, err)
+		_ = s.counterService.DeleteTaskCounter(task.ID)
+		return
+	}
+	if err := s.taskRepo.UpdateProgress(task.ID, 0, 0); err != nil {
+		log.Printf("Error updating task %d progress: %v", task.ID, err)
+	}
+
+	// Update the task model with total recipients for database record
+	task.TotalRecipients = recipientsForThisRun
+	if err := s.taskRepo.Update(task); err != nil {
+		log.Printf("Warning: Failed to update task %d total recipients in database: %v", task.ID, err)
+	}
+
+	log.Printf("Task %d initialized with %d total recipients, status updated to processing", task.ID, recipientsForThisRun)
+	// === End Counter Initialization ===
+
 	// === STREAMING REFACTOR: Process recipients in pages using search_after ===
 	const pageSize = 10000 // Process 10,000 recipients per batch
 	var searchAfter []interface{}
 	var pageCount = 0
+	recipientsToProcess := recipientsForThisRun // New: Track remaining recipients
 
-	for {
+	for recipientsToProcess > 0 {
 		pageCount++
 		log.Printf("Processing page %d for task %d...", pageCount, task.ID)
 
-		recipients, nextSearchAfter, err := s.groupService.ResolveRecipients(group.ID, searchAfter, pageSize)
+		// Determine the page size for the current request
+		currentPageSize := pageSize
+		if recipientsToProcess < pageSize {
+			currentPageSize = recipientsToProcess
+		}
+
+		// Correctly resolve recipients for the current page without incorrect limit/offset
+		recipients, nextSearchAfter, err := s.groupService.ResolveRecipients(group.ID, searchAfter, currentPageSize, task.SendLimit, task.SendOffset)
 		if err != nil {
 			log.Printf("CRITICAL: Failed to resolve recipients for page %d for group %d (Task %d): %v. Aborting task.", pageCount, group.ID, task.ID, err)
 			return // Abort on recipient resolution failure
@@ -193,6 +265,8 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 		}
 		// Update searchAfter for the next iteration
 		searchAfter = nextSearchAfter
+
+		recipientsToProcess -= len(recipients) // Decrement the counter
 
 		log.Printf("Page %d for task %d resolved to %d recipients. Generating dispatch plan...", pageCount, task.ID, len(recipients))
 
@@ -224,6 +298,50 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 			senderMap[sender.ID] = sender
 		}
 
+		// === Aliyun Tag Creation (first page only) ===
+		if pageCount == 1 && (task.AliyunTagName == nil || *task.AliyunTagName == "") {
+			tagName := fmt.Sprintf("task_%d_%d", task.ID, time.Now().Unix())
+			uniqueAccounts := make(map[int64]model.Account)
+			for _, sender := range senderDetails {
+				if _, exists := uniqueAccounts[sender.Account.ID]; !exists {
+					uniqueAccounts[sender.Account.ID] = sender.Account
+				}
+			}
+
+			log.Printf("Task %d: Found %d unique Aliyun accounts for tag creation.", task.ID, len(uniqueAccounts))
+
+			var tagCreationSuccess bool
+			for _, account := range uniqueAccounts {
+				aliyunClient, err := aliyun.NewClient(s.aliyunEndpoint, account.AccessKeyID, account.AccessKeySecret)
+				if err != nil {
+					log.Printf("Warning: Failed to create Aliyun client for account %d on task %d: %v", account.ID, task.ID, err)
+					continue // Skip to next account
+				}
+
+				aliyunSender := aliyun.NewEmailSender(aliyunClient)
+				tagDesc := fmt.Sprintf("Task: %s", task.TaskName)
+				_, err = aliyunSender.CreateTag(tagName, tagDesc)
+				if err != nil {
+					log.Printf("Warning: Failed to create Aliyun tag '%s' for account %d on task %d: %v", tagName, account.ID, task.ID, err)
+					// We continue even if one account fails, but we won't set the tag on the task unless at least one succeeds.
+				} else {
+					log.Printf("Successfully created Aliyun tag '%s' for account %d on task %d", tagName, account.ID, task.ID)
+					tagCreationSuccess = true
+				}
+			}
+
+			if tagCreationSuccess {
+				task.AliyunTagName = &tagName
+				if err := s.taskRepo.Update(task); err != nil {
+					log.Printf("Warning: Failed to update task %d with Aliyun tag name '%s': %v", task.ID, tagName, err)
+				} else {
+					aliyunTagName = tagName // Ensure it's used in this same dispatch run
+					log.Printf("Successfully associated Aliyun tag name '%s' with task %d", tagName, task.ID)
+				}
+			}
+		}
+		// === End Tag Creation ===
+
 		// === Batch-oriented Dispatch Logic for the current page ===
 		recipientOffset := 0
 		for senderID, count := range plan.Assignments {
@@ -245,18 +363,10 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 			for i := 0; i < count; i++ {
 				recipient := pageRecipients[recipientOffset+i]
 
-				renderedSubject, renderedBody, err := s.renderTemplateForRecipient(subjectTpl, bodyTpl, recipient)
-				if err != nil {
-					log.Printf("Error rendering template for recipient %s (Task %d, Page %d): %v", recipient.Email, task.ID, pageCount, err)
-					continue // Skip this recipient
-				}
-
 				record := &model.EmailSendRecord{
 					TaskID:          &task.ID,
 					AccountSenderID: accountSender.ID,
 					RecipientEmail:  recipient.Email,
-					Subject:         renderedSubject,
-					Body:            renderedBody,
 					Status:          model.RecordStatusPending,
 				}
 				recordsToCreate = append(recordsToCreate, record)
@@ -277,11 +387,17 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 
 			// Enqueue a separate job for each created record.
 			for _, record := range recordsToCreate {
+				// We need to re-render the template here to get the body and subject for the job payload.
+				// This is a trade-off: we re-render to avoid storing large bodies in the records table.
+				recipient, _ := s.findRecipientByEmail(pageRecipients, record.RecipientEmail)
+				renderedSubject, renderedBody, _ := s.renderTemplateForRecipient(subjectTpl, bodyTpl, recipient, &accountSender)
+
 				payload := model.EmailJobPayload{
 					RecordID:       record.ID,
+					TaskID:         task.ID,
 					RecipientEmail: record.RecipientEmail,
-					Subject:        record.Subject,
-					Body:           record.Body,
+					Subject:        renderedSubject,
+					Body:           renderedBody,
 					AccountSender:  accountSender,
 					AliyunTagName:  aliyunTagName,
 				}
@@ -290,14 +406,14 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 				if err != nil {
 					log.Printf("CRITICAL: Failed to marshal job payload for record %d: %v. Updating record to failed.", record.ID, err)
 					errMsg := err.Error()
-					_ = s.recordRepo.UpdateStatus(record.ID, model.RecordStatusFailed, "", &errMsg)
+					_ = s.recordRepo.UpdateStatus(record.ID, model.RecordStatusFailed, nil, &errMsg)
 					continue
 				}
 
 				if err := s.queue.Enqueue(ctx, queue.EmailSendingQueue, string(payloadBytes)); err != nil {
 					log.Printf("CRITICAL: Failed to enqueue job for record %d: %v. Updating record to failed.", record.ID, err)
 					errMsg := err.Error()
-					_ = s.recordRepo.UpdateStatus(record.ID, model.RecordStatusFailed, "", &errMsg)
+					_ = s.recordRepo.UpdateStatus(record.ID, model.RecordStatusFailed, nil, &errMsg)
 				}
 			}
 
@@ -306,34 +422,55 @@ func (s *TaskDispatcherService) processImmediateTask(ctx context.Context) {
 	}
 }
 
+func (s *TaskDispatcherService) findRecipientByEmail(recipients []*model.Recipient, email string) (*model.Recipient, bool) {
+	for _, r := range recipients {
+		if r.Email == email {
+			return r, true
+		}
+	}
+	return nil, false
+}
+
 // renderTemplateForRecipient renders the subject and body for a given recipient.
-func (s *TaskDispatcherService) renderTemplateForRecipient(subjectTpl, bodyTpl *template.Template, recipient *model.Recipient) (string, string, error) {
-	// --- FEATURE ENHANCEMENT: Combine recipient fields and metadata for templating ---
-	var data map[string]interface{}
+func (s *TaskDispatcherService) renderTemplateForRecipient(subjectTpl, bodyTpl *template.Template, recipient *model.Recipient, sender *model.AccountSender) (string, string, error) {
+	// --- FEATURE ENHANCEMENT: Combine recipient and sender data for templating ---
+	var recipientData map[string]interface{}
 	if len(recipient.Metadata) > 0 {
-		if err := json.Unmarshal(recipient.Metadata, &data); err != nil {
-			return "", "", fmt.Errorf("failed to unmarshal metadata: %w", err)
+		if err := json.Unmarshal(recipient.Metadata, &recipientData); err != nil {
+			return "", "", fmt.Errorf("failed to unmarshal recipient metadata: %w", err)
 		}
 	} else {
-		data = make(map[string]interface{})
+		recipientData = make(map[string]interface{})
 	}
 
 	// Add top-level recipient fields, allowing metadata to be overridden if keys conflict.
-	data["ID"] = recipient.ID
-	data["Email"] = recipient.Email
-	data["FirstName"] = recipient.FirstName
-	data["LastName"] = recipient.LastName
-	// --- END FEATURE ENHANCEMENT ---
+	recipientData["ID"] = recipient.ID
+	recipientData["Email"] = recipient.Email
+	recipientData["FirstName"] = recipient.FirstName
+	recipientData["LastName"] = recipient.LastName
+
+	var senderData map[string]interface{}
+	if sender != nil && len(sender.Metadata) > 0 {
+		if err := json.Unmarshal(sender.Metadata, &senderData); err != nil {
+			return "", "", fmt.Errorf("failed to unmarshal sender metadata: %w", err)
+		}
+	} else {
+		senderData = make(map[string]interface{})
+	}
+
+	// Combine into a final data map for the template
+	finalData := recipientData
+	finalData["sender"] = senderData // Nest sender data under "Sender" key
 
 	var subjectBuf, bodyBuf bytes.Buffer
 
 	// Render Subject
-	if err := subjectTpl.Execute(&subjectBuf, data); err != nil {
+	if err := subjectTpl.Execute(&subjectBuf, finalData); err != nil {
 		return "", "", fmt.Errorf("failed to execute subject template: %w", err)
 	}
 
 	// Render Body
-	if err := bodyTpl.Execute(&bodyBuf, data); err != nil {
+	if err := bodyTpl.Execute(&bodyBuf, finalData); err != nil {
 		return "", "", fmt.Errorf("failed to execute body template: %w", err)
 	}
 

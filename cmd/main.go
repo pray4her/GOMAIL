@@ -33,6 +33,8 @@ import (
 	"log"
 	"time"
 
+	"golang.org/x/time/rate"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -66,6 +68,13 @@ var elasticsearchRecipientsMapping = `
 }`
 
 func main() {
+	// --- Timezone Correction ---
+	// Set the default timezone to UTC for the entire application.
+	// This ensures consistency in handling time across different environments.
+	// All time-related operations (time.Now(), database timestamps) will now be in UTC.
+	time.Local = time.UTC
+	// ---
+
 	// Load configuration
 	cfg, err := config.LoadConfig(".")
 	if err != nil {
@@ -96,6 +105,9 @@ func main() {
 		log.Fatalf("Failed to ensure Elasticsearch index exists: %v", err)
 	}
 
+	// Initialize the global rate limiter for Aliyun aPI
+	aliyunRateLimiter := rate.NewLimiter(rate.Limit(cfg.Aliyun.RateLimit.Rate), cfg.Aliyun.RateLimit.Burst)
+
 	// Initialize queue service
 	queueService := queue.NewRedisQueueService(redisClient)
 
@@ -104,7 +116,8 @@ func main() {
 	senderRepo := repository.NewSenderRepository(db)
 	templateRepo := repository.NewTemplateRepository(db)
 	emailRecordRepo := repository.NewEmailSendRecordRepository(db)
-	recipientRepo := repository.NewRecipientRepository(db)
+	recipientRepo := repository.NewRecipientRepository(db, esClient)
+	recipientImportTaskRepo := repository.NewRecipientImportTaskRepository(db)
 	taskRepo := repository.NewEmailTaskRepository(db)
 	userRepo := repository.NewGORMUserRepository(db)
 	userPermissionRepo := repository.NewGORMUserPermissionRepository(db)
@@ -116,6 +129,18 @@ func main() {
 	senderService := service.NewSenderService(senderRepo, accountRepo)
 	templateService := service.NewTemplateService(templateRepo)
 	recipientService := service.NewRecipientService(recipientRepo, queueService)
+
+	// Initialize import-related services
+	fileProcessor := service.NewFileProcessorService()
+	recipientImportService := service.NewRecipientImportService(
+		recipientImportTaskRepo,
+		recipientRepo,
+		queueService,
+		fileProcessor,
+		cfg.FileUpload.UploadPath,
+	)
+	recipientImportWorker := service.NewRecipientImportWorkerService(queueService, recipientImportService)
+
 	userService := service.NewUserService(userRepo)
 	authService := service.NewAuthService(userService, cfg.JWT)
 	groupService := service.NewRecipientGroupService(groupRepo, recipientRepo)
@@ -124,7 +149,16 @@ func main() {
 	// New: Initialize the LoadBalancerService
 	loadBalancerService := service.NewLoadBalancerService(senderRepo, sendStatisticsRepo, userPermissionRepo)
 
-	emailService := service.NewEmailService(senderRepo, emailRecordRepo, taskRepo, queueService, cfg.Aliyun.Endpoint)
+	// New: Initialize TaskCounterService for Redis-based counters
+	counterService := service.NewTaskCounterService(redisClient)
+
+	// New: Initialize TaskRecoveryService for system recovery
+	recoveryService := service.NewTaskRecoveryService(taskRepo, emailRecordRepo, counterService)
+
+	// New: Initialize RecipientImportRecoveryService for import task recovery
+	importRecoveryService := service.NewRecipientImportRecoveryService(recipientImportTaskRepo, queueService)
+
+	emailService := service.NewEmailService(senderRepo, emailRecordRepo, taskRepo, counterService, queueService, cfg.Aliyun.Endpoint)
 
 	// Updated: EmailTaskService now has fewer dependencies
 	taskService := service.NewEmailTaskService(taskRepo, groupRepo, templateRepo, queueService)
@@ -133,18 +167,32 @@ func main() {
 	if err != nil {
 		log.Fatalf("Invalid scheduler polling interval: %v", err)
 	}
-	// Updated: TaskDispatcherService now includes the LoadBalancer
-	taskDispatcherService := service.NewTaskDispatcherService(taskRepo, emailRecordRepo, senderRepo, templateRepo, groupService, loadBalancerService, queueService, pollingInterval)
+	// Updated: TaskDispatcherService now includes the LoadBalancer and CounterService
+	taskDispatcherService := service.NewTaskDispatcherService(taskRepo, emailRecordRepo, senderRepo, templateRepo, groupService, loadBalancerService, counterService, queueService, pollingInterval, cfg.Aliyun.Endpoint)
+
+	// Start task recovery before starting the dispatcher
+	if err := recoveryService.RecoverInProgressTasks(); err != nil {
+		log.Fatalf("Failed to recover in-progress tasks: %v", err)
+	}
+
+	// Start recipient import task recovery
+	if err := importRecoveryService.RecoverInProgressImportTasks(); err != nil {
+		log.Fatalf("Failed to recover in-progress import tasks: %v", err)
+	}
+
 	taskDispatcherService.Start(context.Background())
 
 	trackingService := service.NewTrackingService(taskRepo, emailRecordRepo, senderRepo, sendStatisticsRepo, cfg.Aliyun.Endpoint)
-	go trackingService.Start(context.Background(), time.Minute*1)
+	go trackingService.Start(context.Background(), time.Minute*30)
 
 	// Start the new ES Sync Service
 	syncService.Start(context.Background())
 
-	emailWorker := service.NewEmailWorkerService(queueService, emailService)
+	emailWorker := service.NewEmailWorkerService(queueService, emailService, aliyunRateLimiter)
 	emailWorker.Start(context.Background(), cfg.Worker.EmailSenderCount)
+
+	// Start the recipient import worker
+	go recipientImportWorker.StartWorker(context.Background())
 
 	statisticsService := service.NewStatisticsService(emailRecordRepo, taskRepo, sendStatisticsRepo)
 
@@ -153,7 +201,7 @@ func main() {
 	senderHandler := handler.NewSenderHandler(senderService)
 	templateHandler := handler.NewTemplateHandler(templateService)
 	emailHandler := handler.NewEmailHandler(senderRepo, emailRecordRepo, queueService)
-	recipientHandler := handler.NewRecipientHandler(recipientService)
+	recipientHandler := handler.NewRecipientHandler(recipientService, recipientImportService)
 	taskHandler := handler.NewEmailTaskHandler(taskService)
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
@@ -188,6 +236,9 @@ func main() {
 		apiV1.GET("/ping", func(c *gin.Context) {
 			c.JSON(200, gin.H{"message": "pong"})
 		})
+		// Public routes for downloading sample files
+		apiV1.GET("/recipients/batch-upload/sample/csv", recipientHandler.DownloadSampleCSV)
+		apiV1.GET("/recipients/batch-upload/sample/json", recipientHandler.DownloadSampleJSON)
 
 		// --- Protected Routes ---
 		authRequired := apiV1.Group("/")
@@ -204,6 +255,7 @@ func main() {
 				accounts.GET("/:id", accountHandler.GetAccount)
 				accounts.PUT("/:id", accountHandler.UpdateAccount)
 				accounts.DELETE("/:id", accountHandler.DeleteAccount)
+				accounts.GET("/:id/senders", senderHandler.GetSendersByAccountID)
 			}
 
 			// Sender management
@@ -232,6 +284,11 @@ func main() {
 				recipients.GET("/:id", recipientHandler.GetRecipient)
 				recipients.PUT("/:id", recipientHandler.UpdateRecipient)
 				recipients.DELETE("/:id", recipientHandler.DeleteRecipient)
+
+				// Batch import routes
+				recipients.POST("/batch-upload", recipientHandler.BatchUpload)
+				recipients.GET("/import-tasks", recipientHandler.ListImportTasks)
+				recipients.GET("/import-tasks/:id", recipientHandler.GetImportTask)
 			}
 
 			// Recipient Group management
@@ -250,6 +307,7 @@ func main() {
 			tasks := authRequired.Group("/tasks")
 			{
 				tasks.POST("", taskHandler.CreateEmailTask)
+				tasks.GET("", taskHandler.ListTasks)
 				tasks.GET("/:id", statisticsHandler.GetTaskSummary)
 				tasks.GET("/:id/records", statisticsHandler.GetTaskRecords)
 			}

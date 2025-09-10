@@ -31,6 +31,22 @@ type EmailTaskService struct {
 	queue        queue.QueueService
 }
 
+// EmailTaskService defines the interface for email task operations.
+type EmailTaskServiceInterface interface {
+	CreateEmailTask(
+		ctx context.Context,
+		userID int64,
+		taskName string,
+		recipientGroupID int64,
+		templateID *int64,
+		subject, body string,
+		scheduledAt *time.Time,
+		sendLimit *int,
+		sendOffset *int,
+	) (*model.EmailTask, error)
+	ListTasks(page, pageSize int) ([]model.EmailTask, int64, error)
+}
+
 // NewEmailTaskService creates a new EmailTaskService.
 func NewEmailTaskService(
 	taskRepo repository.EmailTaskRepository,
@@ -46,6 +62,11 @@ func NewEmailTaskService(
 	}
 }
 
+// ListTasks retrieves a paginated list of email tasks.
+func (s *EmailTaskService) ListTasks(page, pageSize int) ([]model.EmailTask, int64, error) {
+	return s.taskRepo.List(page, pageSize)
+}
+
 // CreateEmailTask creates a task from either a template or raw content,
 // validates recipients, and queues the task for dispatching.
 func (s *EmailTaskService) CreateEmailTask(
@@ -56,6 +77,8 @@ func (s *EmailTaskService) CreateEmailTask(
 	templateID *int64,
 	subject, body string,
 	scheduledAt *time.Time,
+	sendLimit *int,
+	sendOffset *int,
 ) (*model.EmailTask, error) {
 
 	// --- Validation ---
@@ -87,6 +110,8 @@ func (s *EmailTaskService) CreateEmailTask(
 		CreatedByUserID:  userID,
 		ScheduledAt:      scheduledAt,
 		RecipientGroupID: &recipientGroupID,
+		SendLimit:        sendLimit,
+		SendOffset:       sendOffset,
 	}
 
 	if isTemplateTask {

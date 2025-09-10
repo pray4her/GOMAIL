@@ -14,7 +14,7 @@ type SenderRepository interface {
 	// Account-Sender association operations
 	CreateAccountSender(accountSender *model.AccountSender) error
 	FindAccountSenderByID(id int64) (*model.AccountSender, error)
-	FindSendersByAccountID(accountID int64) ([]model.AccountSender, error)
+	FindSendersByAccountID(accountID int64, page, pageSize int) (*model.PaginatedAccountSenders, error)
 	FindAccountSenderDetails(accountSenderID int64) (*model.AccountSender, error)
 	FindAccountSenderDetailsByIDs(ids []int64) ([]model.AccountSender, error)
 }
@@ -51,10 +51,30 @@ func (r *senderRepository) FindAccountSenderByID(id int64) (*model.AccountSender
 	return &accountSender, err
 }
 
-func (r *senderRepository) FindSendersByAccountID(accountID int64) ([]model.AccountSender, error) {
+func (r *senderRepository) FindSendersByAccountID(accountID int64, page, pageSize int) (*model.PaginatedAccountSenders, error) {
 	var accountSenders []model.AccountSender
-	err := r.db.Preload("Sender").Where("account_id = ?", accountID).Find(&accountSenders).Error
-	return accountSenders, err
+	var totalCount int64
+
+	query := r.db.Model(&model.AccountSender{}).Where("account_id = ?", accountID)
+
+	// Get total count of senders for the account
+	if err := query.Count(&totalCount).Error; err != nil {
+		return nil, err
+	}
+
+	// Apply pagination
+	offset := (page - 1) * pageSize
+	err := query.Preload("Sender").Offset(offset).Limit(pageSize).Find(&accountSenders).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.PaginatedAccountSenders{
+		AccountSenders: accountSenders,
+		TotalCount:     totalCount,
+		Page:           page,
+		PageSize:       pageSize,
+	}, nil
 }
 
 // FindAccountSenderDetails uses JOINs to fetch Account and Sender details in a single query.

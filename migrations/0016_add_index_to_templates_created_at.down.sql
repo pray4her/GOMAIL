@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_email_templates_created_at; 

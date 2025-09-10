@@ -1,0 +1,1 @@
+ALTER TABLE email_tasks DROP COLUMN aliyun_tag_id; 

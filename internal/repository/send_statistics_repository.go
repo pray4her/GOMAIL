@@ -177,7 +177,19 @@ func (r *sendStatisticsRepository) GetSenderStatistics(filter *StatisticsFilter)
 		Group("send_statistics.account_sender_id, account_senders.email_address, senders.name, accounts.name").
 		Order("sent_count DESC")
 
-	query = r.applyFilter(query, filter)
+	// Apply filters with table prefixes to avoid field ambiguity in JOIN queries
+	if filter.StartDate != nil {
+		query = query.Where("send_statistics.stat_date >= ?", filter.StartDate)
+	}
+	if filter.EndDate != nil {
+		query = query.Where("send_statistics.stat_date <= ?", filter.EndDate)
+	}
+	if filter.AccountID != nil {
+		query = query.Where("send_statistics.account_id = ?", filter.AccountID)
+	}
+	if filter.AccountSenderID != nil {
+		query = query.Where("send_statistics.account_sender_id = ?", filter.AccountSenderID)
+	}
 
 	if err := query.Scan(&results).Error; err != nil {
 		return nil, err
@@ -260,7 +272,7 @@ func (r *sendStatisticsRepository) CreateOrUpdate(stats *model.SendStatistics) e
 
 	// Update existing record by adding new counts
 	return r.db.Model(&existing).Updates(model.SendStatistics{
-		SentCount:        existing.SentCount + stats.SentCount,
+		SentCount:        stats.SentCount,
 		OpenCount:        existing.OpenCount + stats.OpenCount,
 		UniqueOpenCount:  existing.UniqueOpenCount + stats.UniqueOpenCount,
 		ClickCount:       existing.ClickCount + stats.ClickCount,

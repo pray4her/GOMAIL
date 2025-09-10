@@ -9,7 +9,7 @@ import (
 type SenderService interface {
 	CreateSender(sender *model.Sender) error
 	AddSenderToAccount(accountID, senderID int64, emailAddress string, dailySendLimit int) (*model.AccountSender, error)
-	GetSendersByAccountID(accountID int64) ([]model.AccountSender, error)
+	GetSendersByAccountID(accountID int64, page, pageSize int) (*model.PaginatedAccountSenders, error)
 }
 
 type senderService struct {
@@ -58,6 +58,6 @@ func (s *senderService) AddSenderToAccount(accountID, senderID int64, emailAddre
 	return accountSender, nil
 }
 
-func (s *senderService) GetSendersByAccountID(accountID int64) ([]model.AccountSender, error) {
-	return s.senderRepo.FindSendersByAccountID(accountID)
+func (s *senderService) GetSendersByAccountID(accountID int64, page, pageSize int) (*model.PaginatedAccountSenders, error) {
+	return s.senderRepo.FindSendersByAccountID(accountID, page, pageSize)
 }

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"log"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 // EmailProcessor defines the interface for processing a single email task.
@@ -19,13 +21,15 @@ type EmailProcessor interface {
 type EmailWorkerService struct {
 	queueService   queue.QueueService
 	emailProcessor EmailProcessor
+	limiter        *rate.Limiter
 }
 
 // NewEmailWorkerService creates a new worker service.
-func NewEmailWorkerService(qs queue.QueueService, ep EmailProcessor) *EmailWorkerService {
+func NewEmailWorkerService(qs queue.QueueService, ep EmailProcessor, limiter *rate.Limiter) *EmailWorkerService {
 	return &EmailWorkerService{
 		queueService:   qs,
 		emailProcessor: ep,
+		limiter:        limiter,
 	}
 }
 
@@ -70,6 +74,15 @@ func (w *EmailWorkerService) processTask(ctx context.Context, workerID int) {
 	}
 
 	log.Printf("[Worker %d] Processing email task for record ID: %d", workerID, payload.RecordID)
+
+	// Wait for the rate limiter. This is the core of the rate limiting logic.
+	// All workers will be blocked here if the overall sending rate exceeds the limit.
+	if err := w.limiter.Wait(ctx); err != nil {
+		log.Printf("[Worker %d] Rate limiter error for record ID %d: %v", workerID, payload.RecordID, err)
+		// We could potentially re-queue the task here, but for now we'll just log and drop it.
+		// A context cancellation error will be caught here.
+		return
+	}
 
 	// Process the email. This is where the actual sending happens.
 	if err := w.emailProcessor.ProcessEmailJob(&payload); err != nil {

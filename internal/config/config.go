@@ -19,6 +19,8 @@ type Config struct {
 	Worker        WorkerConfig
 	Scheduler     SchedulerConfig
 	Elasticsearch es.Config
+	FileUpload    FileUploadConfig
+	Import        ImportConfig
 }
 
 // ServerConfig holds server configuration
@@ -36,6 +38,22 @@ type WorkerConfig struct {
 // SchedulerConfig holds the task scheduler configuration.
 type SchedulerConfig struct {
 	PollingInterval string `mapstructure:"polling_interval"`
+}
+
+// FileUploadConfig holds file upload configuration
+type FileUploadConfig struct {
+	MaxFileSize  string   `mapstructure:"max_file_size"`
+	UploadPath   string   `mapstructure:"upload_path"`
+	AllowedTypes []string `mapstructure:"allowed_types"`
+}
+
+// ImportConfig holds import process configuration
+type ImportConfig struct {
+	BatchSize            int    `mapstructure:"batch_size"`
+	ESBatchSize          int    `mapstructure:"es_batch_size"`
+	MaxConcurrentTasks   int    `mapstructure:"max_concurrent_tasks"`
+	EnableRecovery       bool   `mapstructure:"enable_recovery"`
+	RecoveryStartupDelay string `mapstructure:"recovery_startup_delay"`
 }
 
 // DatabaseConfig holds database configuration
@@ -65,11 +83,17 @@ type RabbitMQConfig struct {
 	URL string `mapstructure:"url"`
 }
 
+// RateLimitConfig holds rate limit configuration.
+type RateLimitConfig struct {
+	Rate  int `mapstructure:"rate"`
+	Burst int `mapstructure:"burst"`
+}
+
 // AliyunConfig holds Aliyun configuration
 type AliyunConfig struct {
-	Endpoint        string `mapstructure:"endpoint"`
-	AccessKeyID     string `mapstructure:"access_key_id"`
-	AccessKeySecret string `mapstructure:"access_key_secret"`
+	Endpoint  string          `mapstructure:"endpoint"`
+	RegionID  string          `mapstructure:"region_id"`
+	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
 }
 
 // JWTConfig holds JWT configuration

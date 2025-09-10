@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS recipient_import_tasks; 

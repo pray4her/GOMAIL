@@ -1,0 +1,1 @@
+CREATE INDEX idx_email_send_records_status_sent_at ON email_send_records(status, sent_at); 

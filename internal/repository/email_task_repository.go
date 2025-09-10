@@ -11,7 +11,11 @@ type EmailTaskRepository interface {
 	Create(task *model.EmailTask) error
 	FindByID(id int64) (*model.EmailTask, error)
 	Update(task *model.EmailTask) error
+	UpdateStatus(taskID int64, status string) error
+	UpdateProgress(taskID int64, sentCount, failedCount int) error
+	FindInProgressTasks() ([]*model.EmailTask, error)
 	FindTrackableTasks(statuses []string) ([]*model.EmailTask, error)
+	List(page, pageSize int) ([]model.EmailTask, int64, error)
 }
 
 type emailTaskRepository struct {
@@ -52,4 +56,49 @@ func (r *emailTaskRepository) FindByID(id int64) (*model.EmailTask, error) {
 	err := r.db.
 		First(&task, id).Error
 	return &task, err
+}
+
+// List retrieves a paginated list of email tasks.
+func (r *emailTaskRepository) List(page, pageSize int) ([]model.EmailTask, int64, error) {
+	var tasks []model.EmailTask
+	var total int64
+
+	// Get total count of tasks
+	if err := r.db.Model(&model.EmailTask{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated tasks
+	offset := (page - 1) * pageSize
+	err := r.db.Order("created_at desc").Offset(offset).Limit(pageSize).Find(&tasks).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return tasks, total, nil
+}
+
+// UpdateStatus updates only the status field of an email task.
+func (r *emailTaskRepository) UpdateStatus(taskID int64, status string) error {
+	return r.db.Model(&model.EmailTask{}).Where("id = ?", taskID).Update("status", status).Error
+}
+
+// UpdateProgress updates the progress tracking fields of an email task.
+func (r *emailTaskRepository) UpdateProgress(taskID int64, sentCount, failedCount int) error {
+	updates := map[string]interface{}{
+		"sent_count":   sentCount,
+		"failed_count": failedCount,
+	}
+	return r.db.Model(&model.EmailTask{}).Where("id = ?", taskID).Updates(updates).Error
+}
+
+// FindInProgressTasks finds tasks that are currently being processed.
+func (r *emailTaskRepository) FindInProgressTasks() ([]*model.EmailTask, error) {
+	var tasks []*model.EmailTask
+	inProgressStatuses := []string{
+		model.TaskStatusDispatching,
+		model.TaskStatusProcessing,
+	}
+	err := r.db.Where("status IN (?)", inProgressStatuses).Find(&tasks).Error
+	return tasks, err
 }

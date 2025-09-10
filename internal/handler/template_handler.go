@@ -11,12 +11,19 @@ import (
 	"gorm.io/gorm"
 )
 
+// TemplateHandler handles HTTP requests for email templates.
 type TemplateHandler struct {
 	service service.TemplateService
 }
 
 func NewTemplateHandler(service service.TemplateService) *TemplateHandler {
 	return &TemplateHandler{service: service}
+}
+
+// ListTemplatesResponse defines the successful response structure for listing templates.
+type ListTemplatesResponse struct {
+	Templates  []model.EmailTemplate `json:"templates"`
+	Pagination Pagination            `json:"pagination"`
 }
 
 // CreateTemplateRequest defines the request body for creating a template.
@@ -62,22 +69,60 @@ func (h *TemplateHandler) CreateTemplate(c *gin.Context) {
 	c.JSON(http.StatusCreated, Response{Data: template})
 }
 
-// GetTemplates retrieves all email templates.
-// @Summary      Get All Templates
-// @Description  Retrieves a list of all email templates.
+// GetTemplates retrieves email templates with optional pagination.
+// @Summary      Get Templates
+// @Description  Retrieves a paginated list of email templates. If page and pageSize are not provided, returns all templates.
 // @Tags         Templates
 // @Produce      json
-// @Success      200  {object}   Response{data=[]model.EmailTemplate}
-// @Failure      500  {object}  Response
+// @Param        page      query     int  false  "Page number for pagination"  default(1)
+// @Param        pageSize  query     int  false  "Number of templates per page"  default(10)
+// @Success      200       {object}  Response{data=ListTemplatesResponse}
+// @Failure      400       {object}  Response  "Invalid page or pageSize parameters"
+// @Failure      500       {object}  Response
 // @Security     ApiKeyAuth
 // @Router       /api/v1/templates [get]
 func (h *TemplateHandler) GetTemplates(c *gin.Context) {
-	templates, err := h.service.GetTemplates()
+	// Check if pagination parameters are provided
+	pageStr := c.Query("page")
+	pageSizeStr := c.Query("pageSize")
+
+	// If no pagination parameters, return all templates (backward compatibility)
+	if pageStr == "" && pageSizeStr == "" {
+		templates, err := h.service.GetTemplates()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, Response{Error: "Failed to retrieve templates"})
+			return
+		}
+		c.JSON(http.StatusOK, Response{Data: templates})
+		return
+	}
+
+	// Parse pagination parameters
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		c.JSON(http.StatusBadRequest, Response{Error: "Invalid page number"})
+		return
+	}
+
+	pageSize, err := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	if err != nil || pageSize < 1 {
+		c.JSON(http.StatusBadRequest, Response{Error: "Invalid page size"})
+		return
+	}
+
+	// Get paginated templates
+	templates, total, err := h.service.ListTemplates(page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, Response{Error: "Failed to retrieve templates"})
 		return
 	}
-	c.JSON(http.StatusOK, Response{Data: templates})
+
+	c.JSON(http.StatusOK, Response{
+		Data: ListTemplatesResponse{
+			Templates:  templates,
+			Pagination: NewPagination(page, pageSize, total),
+		},
+	})
 }
 
 // GetTemplate retrieves a single email template by its ID.

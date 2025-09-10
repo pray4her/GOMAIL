@@ -73,7 +73,7 @@ func (s *StatisticsService) GetTaskSummary(ctx context.Context, taskID int64) (*
 		return nil, fmt.Errorf("failed to find task with id %d: %w", taskID, err)
 	}
 
-	totalRecipients := len(task.RecipientGroup.Members)
+	totalRecipients := task.TotalRecipients
 
 	summary := &TaskSummary{
 		ID:               task.ID,

@@ -9,6 +9,7 @@ import (
 type TemplateRepository interface {
 	Create(template *model.EmailTemplate) error
 	FindAll() ([]model.EmailTemplate, error)
+	List(page, pageSize int) ([]model.EmailTemplate, int64, error)
 	FindByID(id int64) (*model.EmailTemplate, error)
 	Update(template *model.EmailTemplate) error
 	Delete(id int64) error
@@ -30,6 +31,26 @@ func (r *templateRepository) FindAll() ([]model.EmailTemplate, error) {
 	var templates []model.EmailTemplate
 	err := r.db.Find(&templates).Error
 	return templates, err
+}
+
+// List retrieves a paginated list of email templates.
+func (r *templateRepository) List(page, pageSize int) ([]model.EmailTemplate, int64, error) {
+	var templates []model.EmailTemplate
+	var total int64
+
+	// Get total count of templates
+	if err := r.db.Model(&model.EmailTemplate{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated templates
+	offset := (page - 1) * pageSize
+	err := r.db.Order("created_at desc").Offset(offset).Limit(pageSize).Find(&templates).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return templates, total, nil
 }
 
 func (r *templateRepository) FindByID(id int64) (*model.EmailTemplate, error) {

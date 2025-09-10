@@ -19,15 +19,24 @@ func NewEmailSender(client *dm.Client) *EmailSender {
 }
 
 // SendSingleEmail sends a single email and returns the Aliyun RequestID.
-func (s *EmailSender) SendSingleEmail(accountName, fromAlias, toAddress, subject, htmlBody, tagName string, clickTrace bool) (*string, error) {
+func (s *EmailSender) SendSingleEmail(accountName, fromAlias, toAddress, subject, htmlBody, tagName string, replyToEmail *string, clickTrace bool) (*string, error) {
 	singleSendMailRequest := &dm.SingleSendMailRequest{
-		AccountName:    tea.String(accountName),
-		AddressType:    tea.Int32(1), // 1 for sender address
-		ReplyToAddress: tea.Bool(false),
-		ToAddress:      tea.String(toAddress),
-		Subject:        tea.String(subject),
-		HtmlBody:       tea.String(htmlBody),
-		FromAlias:      tea.String(fromAlias),
+		AccountName:            tea.String(accountName),
+		AddressType:            tea.Int32(1), // 1 for sender address
+		ToAddress:              tea.String(toAddress),
+		Subject:                tea.String(subject),
+		HtmlBody:               tea.String(htmlBody),
+		FromAlias:              tea.String(fromAlias),
+		UnSubscribeFilterLevel: tea.String("default"),
+		UnSubscribeLinkType:    tea.String("default"),
+	}
+
+	// 设置ReplyToAddress为false（不使用管理控制台配置的回信地址）
+	singleSendMailRequest.ReplyToAddress = tea.Bool(false)
+
+	// 设置具体的回信地址
+	if replyToEmail != nil && *replyToEmail != "" {
+		singleSendMailRequest.ReplyAddress = tea.String(*replyToEmail)
 	}
 
 	// Add the tag to the request if it's provided.

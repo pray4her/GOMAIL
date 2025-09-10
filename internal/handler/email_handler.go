@@ -68,8 +68,6 @@ func (h *EmailHandler) SendSingleEmail(c *gin.Context) {
 		TaskID:          nil,
 		AccountSenderID: req.AccountSenderID,
 		RecipientEmail:  req.ToAddress,
-		Subject:         req.Subject,
-		Body:            req.HTMLBody,
 		Status:          model.RecordStatusPending,
 	}
 	if err := h.recordRepo.Create(record); err != nil {
@@ -82,8 +80,8 @@ func (h *EmailHandler) SendSingleEmail(c *gin.Context) {
 	payload := model.EmailJobPayload{
 		RecordID:       record.ID,
 		RecipientEmail: record.RecipientEmail,
-		Subject:        record.Subject,
-		Body:           record.Body,
+		Subject:        req.Subject,
+		Body:           req.HTMLBody,
 		AccountSender:  *accountSender,
 		AliyunTagName:  "", // No tag for single ad-hoc emails
 	}

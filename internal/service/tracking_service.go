@@ -8,9 +8,8 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"time"
-
-	dm "github.com/alibabacloud-go/dm-20151123/v2/client"
 )
 
 // TrackingService is responsible for syncing email tracking data from Aliyun.
@@ -55,15 +54,18 @@ func (s *TrackingService) Start(ctx context.Context, interval time.Duration) {
 			if err := s.SyncTaskTrackingData(ctx); err != nil {
 				log.Printf("Error during task tracking data sync: %v", err)
 			}
+			log.Println("Running sent count statistics sync...")
+			if err := s.SyncSentCountStatistics(ctx); err != nil {
+				log.Printf("Error during sent count statistics sync: %v", err)
+			}
 		}
 	}
 }
 
 // SyncTaskTrackingData fetches ongoing tasks and updates their aggregate stats from Aliyun.
 func (s *TrackingService) SyncTaskTrackingData(ctx context.Context) error {
-	// Find tasks that are in progress and have a tag.
-	// The specific statuses might need refinement based on the task lifecycle.
-	tasks, err := s.taskRepo.FindTrackableTasks([]string{"pending", "dispatching", "sending"})
+	// 1. Find all trackable tasks
+	tasks, err := s.taskRepo.FindTrackableTasks([]string{"pending", "dispatching", "sending", "completed"})
 	if err != nil {
 		return fmt.Errorf("failed to find trackable tasks: %w", err)
 	}
@@ -72,135 +74,209 @@ func (s *TrackingService) SyncTaskTrackingData(ctx context.Context) error {
 		log.Println("No trackable tasks found.")
 		return nil
 	}
-
 	log.Printf("Found %d tasks to track.", len(tasks))
 
+	taskIDs := make([]int64, len(tasks))
+	for i, task := range tasks {
+		taskIDs[i] = task.ID
+	}
+
+	// 2. Batch fetch all relevant records for these tasks
+	allRecords, err := s.recordRepo.FindByTaskIDs(taskIDs)
+	if err != nil {
+		return fmt.Errorf("failed to batch fetch records for tasks: %w", err)
+	}
+
+	// 3. Group records by task ID and collect unique sender IDs
+	recordsByTaskID := make(map[int64][]*model.EmailSendRecord)
+	senderIDSet := make(map[int64]struct{})
+	for _, record := range allRecords {
+		if record.TaskID != nil {
+			recordsByTaskID[*record.TaskID] = append(recordsByTaskID[*record.TaskID], record)
+			senderIDSet[record.AccountSenderID] = struct{}{}
+		}
+	}
+
+	senderIDs := make([]int64, 0, len(senderIDSet))
+	for id := range senderIDSet {
+		senderIDs = append(senderIDs, id)
+	}
+
+	// 4. Batch fetch all unique senders
+	allSenders, err := s.senderRepo.FindAccountSenderDetailsByIDs(senderIDs)
+	if err != nil {
+		return fmt.Errorf("failed to batch fetch sender details: %w", err)
+	}
+	sendersByID := make(map[int64]*model.AccountSender)
+	for _, sender := range allSenders {
+		// Note: This creates a new pointer for each sender to avoid issues with loop variable scope.
+		s := sender
+		sendersByID[sender.ID] = &s
+	}
+
+	// 5. Process each task with pre-fetched data
 	for _, task := range tasks {
 		if task.AliyunTagName == nil || *task.AliyunTagName == "" {
 			continue // Should not happen based on query, but as a safeguard.
 		}
 
-		// Since a task can now use many senders, we must find a representative sender to get API credentials.
-		// We'll fetch the task's records and use the sender from the first one.
-		// This assumes the Aliyun tag for the task was created using credentials from a participating sender.
-		records, err := s.recordRepo.FindByTaskID(task.ID)
-		if err != nil {
-			log.Printf("Error fetching records for task %d to find sender: %v. Skipping.", task.ID, err)
-			continue
-		}
-		if len(records) == 0 {
-			log.Printf("No records for task %d, cannot determine tracking sender. Skipping.", task.ID)
+		taskRecords, ok := recordsByTaskID[task.ID]
+		if !ok || len(taskRecords) == 0 {
+			log.Printf("No records found in pre-fetched map for task %d. Skipping.", task.ID)
 			continue
 		}
 
-		// We need the sender details to initialize the Aliyun client.
-		accountSender, err := s.senderRepo.FindAccountSenderDetails(records[0].AccountSenderID)
-		if err != nil {
-			log.Printf("Error fetching sender details for task %d: %v. Skipping.", task.ID, err)
-			continue
+		// --- Refactored Tracking Logic ---
+
+		// 5.1. Identify all unique accounts involved in this task.
+		uniqueAccounts := make(map[int64]*model.Account)
+		sendersByAccount := make(map[int64][]*model.AccountSender)
+
+		for _, record := range taskRecords {
+			if sender, senderOK := sendersByID[record.AccountSenderID]; senderOK {
+				if _, accOK := uniqueAccounts[sender.AccountID]; !accOK {
+					uniqueAccounts[sender.AccountID] = &sender.Account
+				}
+				sendersByAccount[sender.AccountID] = append(sendersByAccount[sender.AccountID], sender)
+			}
 		}
 
-		s.updateTaskTracking(accountSender, task)
+		// 5.2. Initialize aggregate counters for the task.
+		newTotalOpenCount := 0
+		newTotalClickCount := 0
+		newTotalUniqueOpenCount := 0
+		newTotalUniqueClickCount := 0
+
+		// 5.3. Loop through each unique account, fetch its data, and aggregate.
+		for accountID, account := range uniqueAccounts {
+			// Find a valid sender email for this account to use in the API call.
+			accountSenders := sendersByAccount[accountID]
+			if len(accountSenders) == 0 {
+				log.Printf("Warning: No senders found for account %d in task %d. Skipping tracking for this account.", accountID, task.ID)
+				continue
+			}
+			representativeSenderEmail := accountSenders[0].EmailAddress
+
+			// Create client for this specific account.
+			client, err := aliyun.NewClient(s.aliyunEndpoint, account.AccessKeyID, account.AccessKeySecret)
+			if err != nil {
+				log.Printf("Error creating Aliyun client for account %d in task %d: %v", accountID, task.ID, err)
+				continue
+			}
+			aliyunSender := aliyun.NewEmailSender(client)
+
+			startTime := task.CreatedAt.Format("2006-01-02")
+			endTime := time.Now().Format("2006-01-02")
+
+			responseBody, err := aliyunSender.GetTrackList(representativeSenderEmail, *task.AliyunTagName, startTime, endTime)
+			if err != nil {
+				log.Printf("Error getting track list for task %d, account %d (tag: %s): %v", task.ID, accountID, *task.AliyunTagName, err)
+				continue // Don't let one account's failure stop the whole sync.
+			}
+
+			if responseBody != nil && responseBody.Data != nil && responseBody.Data.Stat != nil && len(responseBody.Data.Stat) > 0 {
+				stat := responseBody.Data.Stat[0]
+				openCount, _ := strconv.Atoi(*stat.RcptOpenCount)
+				clickCount, _ := strconv.Atoi(*stat.RcptClickCount)
+				uniqueOpenCount, _ := strconv.Atoi(*stat.RcptUniqueOpenCount)
+				uniqueClickCount, _ := strconv.Atoi(*stat.RcptUniqueClickCount)
+
+				newTotalOpenCount += openCount
+				newTotalClickCount += clickCount
+				newTotalUniqueOpenCount += uniqueOpenCount
+				newTotalUniqueClickCount += uniqueClickCount
+			}
+		}
+
+		// 5.4. Update the task with the new aggregated totals and calculated rates.
+		task.OpenCount = newTotalOpenCount
+		task.ClickCount = newTotalClickCount
+		task.UniqueOpenCount = newTotalUniqueOpenCount
+		task.UniqueClickCount = newTotalUniqueClickCount
+
+		if task.TotalRecipients > 0 {
+			task.OpenRate = float64(task.OpenCount) / float64(task.TotalRecipients)
+			task.ClickRate = float64(task.ClickCount) / float64(task.TotalRecipients)
+			task.UniqueOpenRate = float64(task.UniqueOpenCount) / float64(task.TotalRecipients)
+			task.UniqueClickRate = float64(task.UniqueClickCount) / float64(task.TotalRecipients)
+		}
+
+		if err := s.taskRepo.Update(task); err != nil {
+			log.Printf("Error updating task %d with aggregated tracking data: %v", task.ID, err)
+		} else {
+			log.Printf("Successfully updated task %d with aggregated tracking data: Opens=%d, Clicks=%d", task.ID, task.OpenCount, task.ClickCount)
+		}
+		// --- End Refactored Logic ---
+
+		// Add a delay between each task processing to avoid hitting API rate limits.
+		time.Sleep(200 * time.Millisecond) // 200ms delay
 	}
 
 	return nil
 }
 
-func (s *TrackingService) updateTaskTracking(accountSender *model.AccountSender, task *model.EmailTask) {
-	client, err := aliyun.NewClient(
-		s.aliyunEndpoint,
-		accountSender.Account.AccessKeyID,
-		accountSender.Account.AccessKeySecret,
-	)
+// SyncSentCountStatistics aggregates sent counts from local records and updates the statistics table.
+// This function is now less critical for task-level accuracy but still useful for sender-level daily stats.
+func (s *TrackingService) SyncSentCountStatistics(ctx context.Context) error {
+	// Aggregate stats for the last 3 days to catch any delays or missed updates.
+	since := time.Now().Add(-72 * time.Hour)
+	results, err := s.recordRepo.GetAggregatedSentCounts(since)
 	if err != nil {
-		log.Printf("Error creating Aliyun client for task %d: %v", task.ID, err)
-		return
+		return fmt.Errorf("failed to get aggregated sent counts: %w", err)
 	}
-	aliyunSender := aliyun.NewEmailSender(client)
 
-	startTime := task.CreatedAt.Format("2006-01-02")
-	endTime := time.Now().Format("2006-01-02")
+	if len(results) == 0 {
+		return nil
+	}
 
-	responseBody, err := aliyunSender.GetTrackList(accountSender.EmailAddress, *task.AliyunTagName, startTime, endTime)
+	log.Printf("Found %d daily sender stats to update since %v", len(results), since.Format("2006-01-02"))
+
+	// To perform updates, we need the account ID for each sender.
+	senderIDs := make([]int64, 0, len(results))
+	for _, res := range results {
+		senderIDs = append(senderIDs, res.AccountSenderID)
+	}
+	senders, err := s.senderRepo.FindAccountSenderDetailsByIDs(senderIDs)
 	if err != nil {
-		log.Printf("Error getting track list for task %d (tag: %s): %v", task.ID, *task.AliyunTagName, err)
-		return
+		return fmt.Errorf("failed to get sender details for stats update: %w", err)
+	}
+	senderAccountMap := make(map[int64]int64)
+	for _, sender := range senders {
+		senderAccountMap[sender.ID] = sender.AccountID
 	}
 
-	// The GetTrackList now returns the full body. We need to check for nil and the data slice.
-	if responseBody == nil || responseBody.Data == nil || responseBody.Data.Stat == nil || len(responseBody.Data.Stat) == 0 {
-		return // No data yet.
+	for _, result := range results {
+		accountID, ok := senderAccountMap[result.AccountSenderID]
+		if !ok {
+			log.Printf("Warning: Could not find account ID for sender %d. Skipping stat update.", result.AccountSenderID)
+			continue
+		}
+
+		stat := &model.SendStatistics{
+			StatDate:        result.StatDate,
+			AccountID:       accountID,
+			AccountSenderID: result.AccountSenderID,
+			SentCount:       result.SentCount,
+			// Open/Click counts are handled by the other sync method
+		}
+
+		if err := s.statsRepo.CreateOrUpdate(stat); err != nil {
+			log.Printf("Error updating sent count statistics for sender %d on %s: %v",
+				result.AccountSenderID, result.StatDate.Format("2006-01-02"), err)
+		}
 	}
 
-	stat := responseBody.Data.Stat[0] // Assuming one aggregated stat object per tag.
-	s.processAndStoreStatistics(stat, task, accountSender)
+	return nil
 }
 
-func (s *TrackingService) processAndStoreStatistics(stat *dm.GetTrackListResponseBodyDataStat, task *model.EmailTask, accountSender *model.AccountSender) {
-	// Parse new counts from Aliyun response
-	newOpenCount, _ := strconv.Atoi(*stat.RcptOpenCount)
-	newClickCount, _ := strconv.Atoi(*stat.RcptClickCount)
-	newUniqueOpenCount, _ := strconv.Atoi(*stat.RcptUniqueOpenCount)
-	newUniqueClickCount, _ := strconv.Atoi(*stat.RcptUniqueClickCount)
-	// newSentCount, _ := strconv.Atoi(*stat.TotalNumber) // This is a cumulative total, sent count is handled on dispatch.
-
-	// Calculate the increment since the last sync for this task
-	openIncrement := newOpenCount - task.OpenCount
-	clickIncrement := newClickCount - task.ClickCount
-	uniqueOpenIncrement := newUniqueOpenCount - task.UniqueOpenCount
-	uniqueClickIncrement := newUniqueClickCount - task.UniqueClickCount
-
-	// Sent count is associated with the task creation, not incremental.
-	// We handle sent count when the task is dispatched, not here.
-	// However, if we need to sync it from Aliyun, a similar incremental logic would apply.
-
-	hasUpdate := openIncrement > 0 || clickIncrement > 0 || uniqueOpenIncrement > 0 || uniqueClickIncrement > 0
-
-	if hasUpdate {
-		// 1. Update the aggregate statistics table for today
-		today := time.Now().Truncate(24 * time.Hour)
-		dailyStat := &model.SendStatistics{
-			StatDate:        today,
-			AccountID:       accountSender.AccountID,
-			AccountSenderID: accountSender.ID,
-			// We only record increments. Sent count is handled elsewhere.
-			SentCount:        0,
-			OpenCount:        openIncrement,
-			UniqueOpenCount:  uniqueOpenIncrement,
-			ClickCount:       clickIncrement,
-			UniqueClickCount: uniqueClickIncrement,
-		}
-
-		if err := s.statsRepo.CreateOrUpdate(dailyStat); err != nil {
-			log.Printf("Error updating daily aggregate statistics for task %d: %v", task.ID, err)
-		} else {
-			log.Printf("Successfully updated daily aggregate statistics: Opens=%d, Clicks=%d", openIncrement, clickIncrement)
-		}
-
-		// 2. Update the task's own counters to the new total
-		task.OpenCount = newOpenCount
-		task.ClickCount = newClickCount
-		task.UniqueOpenCount = newUniqueOpenCount
-		task.UniqueClickCount = newUniqueClickCount
-		// Also update rates on the task model
-		task.OpenRate, _ = parseFloatRate(*stat.RcptOpenRate)
-		task.ClickRate, _ = parseFloatRate(*stat.RcptClickRate)
-		task.UniqueOpenRate, _ = parseFloatRate(*stat.RcptUniqueOpenRate)
-		task.UniqueClickRate, _ = parseFloatRate(*stat.RcptUniqueClickRate)
-
-		if err := s.taskRepo.Update(task); err != nil {
-			log.Printf("Error updating tracking info for task %d: %v", task.ID, err)
-		} else {
-			log.Printf("Updated tracking for task %d: TotalOpens=%d, TotalClicks=%d", task.ID, task.OpenCount, task.ClickCount)
-		}
-	}
-}
-
-// parseFloatRate safely parses a string rate from Aliyun into a float64.
-// Aliyun provides rates as strings, e.g., "0" or "85.34".
 func parseFloatRate(rateStr string) (float64, error) {
-	if rateStr == "" {
-		return 0.0, nil
+	if strings.HasSuffix(rateStr, "%") {
+		rateStr = strings.TrimSuffix(rateStr, "%")
+		val, err := strconv.ParseFloat(rateStr, 64)
+		if err != nil {
+			return 0, err
+		}
+		return val / 100.0, nil
 	}
 	return strconv.ParseFloat(rateStr, 64)
 }

@@ -18,7 +18,8 @@ import (
 type RecipientService interface {
 	CreateRecipient(email string, firstName, lastName *string, metadata map[string]interface{}) (*model.Recipient, error)
 	GetRecipient(id uint) (*model.Recipient, error)
-	ListRecipients(page, pageSize int) ([]model.Recipient, int64, error)
+	ListRecipients(page, pageSize int, filters map[string]string) ([]model.Recipient, int64, error)
+	ListRecipientsWithSearchAfter(searchAfter []interface{}, pageSize int, filters map[string]string) ([]model.Recipient, []interface{}, int64, error)
 	UpdateRecipient(id uint, email *string, firstName, lastName *string, status *string, metadata map[string]interface{}) (*model.Recipient, error)
 	DeleteRecipient(id uint) error
 }
@@ -81,8 +82,12 @@ func (s *recipientService) GetRecipient(id uint) (*model.Recipient, error) {
 	return s.repo.FindByID(id)
 }
 
-func (s *recipientService) ListRecipients(page, pageSize int) ([]model.Recipient, int64, error) {
-	return s.repo.List(page, pageSize)
+func (s *recipientService) ListRecipients(page, pageSize int, filters map[string]string) ([]model.Recipient, int64, error) {
+	return s.repo.List(page, pageSize, filters)
+}
+
+func (s *recipientService) ListRecipientsWithSearchAfter(searchAfter []interface{}, pageSize int, filters map[string]string) ([]model.Recipient, []interface{}, int64, error) {
+	return s.repo.ListWithSearchAfter(searchAfter, pageSize, filters)
 }
 
 func (s *recipientService) UpdateRecipient(id uint, email *string, firstName, lastName *string, status *string, metadata map[string]interface{}) (*model.Recipient, error) {

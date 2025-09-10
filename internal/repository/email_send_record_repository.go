@@ -15,7 +15,10 @@ type EmailSendRecordRepository interface {
 	FindByID(id int64) (*model.EmailSendRecord, error)
 	FindTrackableRecords(since time.Time, statuses []string) ([]*model.EmailSendRecord, error)
 	FindByTaskID(taskID int64) ([]*model.EmailSendRecord, error)
-	UpdateStatus(id int64, status, aliyunTaskID string, errorMessage *string) error
+	FindByTaskIDs(taskIDs []int64) ([]*model.EmailSendRecord, error)
+	UpdateStatus(recordID int64, status string, aliyunTaskID *string, errorMessage *string) error
+	GetSentStatusCounts(taskID int64) (sent int64, failed int64, err error)
+	GetAggregatedSentCounts(since time.Time) ([]*model.DailySenderSentCount, error)
 }
 
 type emailSendRecordRepository struct {
@@ -66,19 +69,78 @@ func (r *emailSendRecordRepository) FindByTaskID(taskID int64) ([]*model.EmailSe
 	return records, err
 }
 
-// UpdateStatus updates specific fields of a send record to avoid GORM association magic.
-func (r *emailSendRecordRepository) UpdateStatus(id int64, status, aliyunTaskID string, errorMessage *string) error {
+func (r *emailSendRecordRepository) FindByTaskIDs(taskIDs []int64) ([]*model.EmailSendRecord, error) {
+	var records []*model.EmailSendRecord
+	if len(taskIDs) == 0 {
+		return records, nil
+	}
+	// Explicitly select only the columns needed by the tracking service to avoid loading large data.
+	err := r.db.Select("id", "task_id", "account_sender_id").Where("task_id IN ?", taskIDs).Find(&records).Error
+	return records, err
+}
+
+// UpdateStatus updates the status and other tracking fields of a send record.
+func (r *emailSendRecordRepository) UpdateStatus(recordID int64, status string, aliyunTaskID *string, errorMessage *string) error {
 	updates := map[string]interface{}{
 		"status":                status,
 		"last_status_update_at": time.Now(),
-		"aliyun_task_id":        aliyunTaskID,
-		"error_message":         errorMessage,
 	}
-
-	// Only set sent_at if the status is 'sent'
 	if status == model.RecordStatusSent {
 		updates["sent_at"] = time.Now()
 	}
 
-	return r.db.Model(&model.EmailSendRecord{}).Where("id = ?", id).Updates(updates).Error
+	if aliyunTaskID != nil {
+		updates["aliyun_task_id"] = *aliyunTaskID
+	}
+
+	if errorMessage != nil {
+		updates["error_message"] = errorMessage
+	}
+
+	return r.db.Model(&model.EmailSendRecord{}).Where("id = ?", recordID).Updates(updates).Error
+}
+
+// GetAggregatedSentCounts aggregates the count of successfully sent emails
+// for each sender on each day since the provided timestamp.
+func (r *emailSendRecordRepository) GetAggregatedSentCounts(since time.Time) ([]*model.DailySenderSentCount, error) {
+	var results []*model.DailySenderSentCount
+
+	err := r.db.Model(&model.EmailSendRecord{}).
+		Select(`
+			DATE(sent_at) as stat_date,
+			account_sender_id,
+			COUNT(*) as sent_count
+		`).
+		Where("status = ? AND sent_at >= ?", model.RecordStatusSent, since).
+		Group("DATE(sent_at), account_sender_id").
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// GetSentStatusCounts counts the number of sent and failed records for a given task.
+func (r *emailSendRecordRepository) GetSentStatusCounts(taskID int64) (sent int64, failed int64, err error) {
+	var result struct {
+		Sent   int64
+		Failed int64
+	}
+
+	err = r.db.Model(&model.EmailSendRecord{}).
+		Where("task_id = ? AND status = ?", taskID, model.RecordStatusSent).
+		Count(&result.Sent).Error
+	if err != nil {
+		return 0, 0, err
+	}
+
+	err = r.db.Model(&model.EmailSendRecord{}).
+		Where("task_id = ? AND status = ?", taskID, model.RecordStatusFailed).
+		Count(&result.Failed).Error
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return result.Sent, result.Failed, nil
 }

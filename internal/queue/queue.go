@@ -11,6 +11,8 @@ const (
 	TaskScheduledQueue = "tasks:scheduled"
 	// RecipientSyncQueue is the queue for recipient create/update events to be synced to Elasticsearch.
 	RecipientSyncQueue = "recipients:sync"
+	// RecipientImportQueue is the queue for recipient import tasks to be processed.
+	RecipientImportQueue = "recipients:import"
 )
 
 // QueueService defines the interface for a message queue.

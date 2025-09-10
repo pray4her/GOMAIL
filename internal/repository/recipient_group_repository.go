@@ -26,8 +26,8 @@ type RecipientGroupRepository interface {
 	RemoveMembers(groupID int64, recipientIDs []int64) error
 
 	// Methods for resolving dynamic groups
-	FindRecipientsByRules(rules []model.RecipientGroupRule, searchAfter []interface{}, pageSize int) ([]*model.Recipient, []interface{}, error)
-	CountByRules(rules []model.RecipientGroupRule) (int64, error)
+	FindRecipientsByRules(rules []model.RecipientGroupRule, searchAfter []interface{}, pageSize int, limit *int, offset *int) ([]*model.Recipient, []interface{}, error)
+	CountByRules(rules []model.RecipientGroupRule, limit *int, offset *int) (int64, error)
 }
 
 type recipientGroupRepository struct {
@@ -142,7 +142,7 @@ func (r *recipientGroupRepository) buildESQuery(rules []model.RecipientGroupRule
 }
 
 // CountByRules directly asks Elasticsearch for the count of documents matching the rules.
-func (r *recipientGroupRepository) CountByRules(rules []model.RecipientGroupRule) (int64, error) {
+func (r *recipientGroupRepository) CountByRules(rules []model.RecipientGroupRule, limit *int, offset *int) (int64, error) {
 	if len(rules) == 0 {
 		return 0, nil
 	}
@@ -151,35 +151,71 @@ func (r *recipientGroupRepository) CountByRules(rules []model.RecipientGroupRule
 	if err != nil {
 		return 0, err
 	}
-	query := fmt.Sprintf(`{ "query": %s }`, queryPart)
+	// === FIX: Build the full query with from and size for accurate counting ===
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString(`{`)
+	queryBuilder.WriteString(fmt.Sprintf(`"query": %s,`, queryPart))
+	// We don't need the source, just the count, but we need a search query.
+	queryBuilder.WriteString(`"_source": false,`)
+	// We use `track_total_hits: true` to get the full count regardless of pagination.
+	// This is the number we need for the total count.
+	queryBuilder.WriteString(`"track_total_hits": true`)
+	queryBuilder.WriteString(`}`)
 
-	res, err := r.es.Count(
-		r.es.Count.WithContext(context.Background()),
-		r.es.Count.WithIndex("recipients"),
-		r.es.Count.WithBody(strings.NewReader(query)),
+	query := queryBuilder.String()
+
+	// Use the Search API instead of Count API to handle limit/offset logic implicitly later
+	res, err := r.es.Search(
+		r.es.Search.WithContext(context.Background()),
+		r.es.Search.WithIndex("recipients"),
+		r.es.Search.WithBody(strings.NewReader(query)),
+		r.es.Search.WithSize(0), // We don't need documents, just the total count
 	)
+
 	if err != nil {
-		return 0, fmt.Errorf("elasticsearch count failed: %w", err)
+		return 0, fmt.Errorf("elasticsearch search for count failed: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return 0, fmt.Errorf("elasticsearch count returned an error: %s", res.String())
+		return 0, fmt.Errorf("elasticsearch search for count returned an error: %s", res.String())
 	}
 
 	var esResponse struct {
-		Count int64 `json:"count"`
+		Hits struct {
+			Total struct {
+				Value int64 `json:"value"`
+			} `json:"total"`
+		} `json:"hits"`
 	}
 
 	if err := json.NewDecoder(res.Body).Decode(&esResponse); err != nil {
 		return 0, fmt.Errorf("failed to decode elasticsearch count response: %w", err)
 	}
 
-	return esResponse.Count, nil
+	totalCount := esResponse.Hits.Total.Value
+
+	// Apply offset logic
+	start := 0
+	if offset != nil {
+		start = *offset
+	}
+
+	if int64(start) >= totalCount {
+		return 0, nil // Offset is beyond the total number of documents
+	}
+
+	// Apply limit logic
+	countAfterOffset := totalCount - int64(start)
+	if limit != nil && int64(*limit) < countAfterOffset {
+		return int64(*limit), nil
+	}
+
+	return countAfterOffset, nil
 }
 
 // FindRecipientsByRules dynamically builds and executes a query against Elasticsearch using the search_after parameter for deep pagination.
-func (r *recipientGroupRepository) FindRecipientsByRules(rules []model.RecipientGroupRule, searchAfter []interface{}, pageSize int) ([]*model.Recipient, []interface{}, error) {
+func (r *recipientGroupRepository) FindRecipientsByRules(rules []model.RecipientGroupRule, searchAfter []interface{}, pageSize int, limit *int, offset *int) ([]*model.Recipient, []interface{}, error) {
 	if pageSize <= 0 {
 		pageSize = 1000 // Default page size
 	}
@@ -189,11 +225,33 @@ func (r *recipientGroupRepository) FindRecipientsByRules(rules []model.Recipient
 		return nil, nil, err
 	}
 
+	// === FIX: Handle offset using search_after instead of from to avoid deep pagination limits ===
+	// If we have an offset but no searchAfter, we need to build the searchAfter by skipping records
+	if offset != nil && *offset > 0 && len(searchAfter) == 0 {
+		// First, we need to get the search_after value for the offset position
+		currentSearchAfter, err := r.getSearchAfterForOffset(rules, *offset)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to build search_after for offset %d: %w", *offset, err)
+		}
+		searchAfter = currentSearchAfter
+	}
+
 	var queryBuilder strings.Builder
 	queryBuilder.WriteString(`{`)
 	queryBuilder.WriteString(fmt.Sprintf(`"query": %s,`, queryPart))
 	queryBuilder.WriteString(`"_source": ["recipient_id"],`)
-	queryBuilder.WriteString(fmt.Sprintf(`"size": %d,`, pageSize))
+
+	// Apply limit and offset
+	finalSize := pageSize
+	if limit != nil {
+		// If a limit is provided, it should be the maximum size we fetch.
+		if *limit < finalSize {
+			finalSize = *limit
+		}
+	}
+	queryBuilder.WriteString(fmt.Sprintf(`"size": %d,`, finalSize))
+
+	// No longer using "from" for deep pagination - always use search_after when available
 	// Use recipient_id for a stable and unique sort order.
 	queryBuilder.WriteString(`"sort": [{"recipient_id": "asc"}]`)
 
@@ -258,4 +316,80 @@ func (r *recipientGroupRepository) FindRecipientsByRules(rules []model.Recipient
 	nextSearchAfter := esResponse.Hits.Hits[len(esResponse.Hits.Hits)-1].Sort
 
 	return recipients, nextSearchAfter, nil
+}
+
+// getSearchAfterForOffset builds a search_after value by skipping the specified number of records
+func (r *recipientGroupRepository) getSearchAfterForOffset(rules []model.RecipientGroupRule, offset int) ([]interface{}, error) {
+	const maxSingleQuery = 10000 // ES limit for from+size
+
+	queryPart, err := r.buildESQuery(rules)
+	if err != nil {
+		return nil, err
+	}
+
+	var currentSearchAfter []interface{}
+	remainingOffset := offset
+
+	for remainingOffset > 0 {
+		// Calculate the size for this iteration
+		querySize := maxSingleQuery
+		if remainingOffset < maxSingleQuery {
+			querySize = remainingOffset
+		}
+
+		var queryBuilder strings.Builder
+		queryBuilder.WriteString(`{`)
+		queryBuilder.WriteString(fmt.Sprintf(`"query": %s,`, queryPart))
+		queryBuilder.WriteString(`"_source": ["recipient_id"],`)
+		queryBuilder.WriteString(fmt.Sprintf(`"size": %d,`, querySize))
+		queryBuilder.WriteString(`"sort": [{"recipient_id": "asc"}]`)
+
+		if len(currentSearchAfter) > 0 {
+			searchAfterJSON, err := json.Marshal(currentSearchAfter)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal search_after in offset building: %w", err)
+			}
+			queryBuilder.WriteString(fmt.Sprintf(`, "search_after": %s`, string(searchAfterJSON)))
+		}
+
+		queryBuilder.WriteString(`}`)
+
+		// Execute the search request
+		res, err := r.es.Search(
+			r.es.Search.WithContext(context.Background()),
+			r.es.Search.WithIndex("recipients"),
+			r.es.Search.WithBody(strings.NewReader(queryBuilder.String())),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("elasticsearch search failed during offset building: %w", err)
+		}
+		defer res.Body.Close()
+
+		if res.IsError() {
+			return nil, fmt.Errorf("elasticsearch search returned an error during offset building: %s", res.String())
+		}
+
+		var esResponse struct {
+			Hits struct {
+				Hits []struct {
+					Sort []interface{} `json:"sort"`
+				} `json:"hits"`
+			} `json:"hits"`
+		}
+
+		if err := json.NewDecoder(res.Body).Decode(&esResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode elasticsearch response during offset building: %w", err)
+		}
+
+		if len(esResponse.Hits.Hits) == 0 {
+			// No more records available, return what we have
+			break
+		}
+
+		// Update the search_after for next iteration
+		currentSearchAfter = esResponse.Hits.Hits[len(esResponse.Hits.Hits)-1].Sort
+		remainingOffset -= len(esResponse.Hits.Hits)
+	}
+
+	return currentSearchAfter, nil
 }

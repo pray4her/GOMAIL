@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_email_send_records_status_sent_at; 

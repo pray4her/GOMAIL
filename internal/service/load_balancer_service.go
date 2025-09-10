@@ -22,6 +22,13 @@ type senderWithQuota struct {
 	dailyRemain int
 }
 
+// New struct for the new algorithm
+type dispatchCandidate struct {
+	sender                model.AccountSender
+	dailyRemain           int
+	effectiveContribution float64
+}
+
 // LoadBalancerService is responsible for calculating the optimal distribution of email sending tasks.
 type LoadBalancerService interface {
 	GenerateDispatchPlan(userID int64, totalEmailsToSend int) (*DispatchPlan, error)
@@ -100,41 +107,54 @@ func (s *loadBalancerService) GenerateDispatchPlan(userID int64, totalEmailsToSe
 		return plan, nil
 	}
 
-	// 6. Distribute emails
-	// First, distribute equally among accounts
-	emailsPerAccount := emailsToAssign / len(accounts)
-	for accountID, senderList := range accounts {
-		accountEmails := emailsPerAccount
-		// In the last loop, add the remainder
-		if accountID == getLastAccountKey(accounts) {
-			accountEmails += emailsToAssign % len(accounts)
-		}
-
-		// Second, distribute within the account based on weight
-		totalWeight := 0
+	// 6. New "Weighted Quota Distribution" Algorithm
+	// 6.1 Prepare candidates and calculate total effective contribution
+	var candidates []dispatchCandidate
+	var totalEffectiveContribution float64
+	for _, senderList := range accounts {
 		for _, sq := range senderList {
-			totalWeight += sq.sender.Weight
-		}
-
-		if totalWeight > 0 {
-			remainingForAccount := accountEmails
-			for _, sq := range senderList {
-				share := (float64(sq.sender.Weight) / float64(totalWeight)) * float64(accountEmails)
-				assigned := min(int(share), sq.dailyRemain)
-				plan.Assignments[sq.sender.ID] += assigned
-				remainingForAccount -= assigned
+			contribution := float64(sq.dailyRemain) * float64(sq.sender.Weight)
+			if contribution > 0 {
+				candidate := dispatchCandidate{
+					sender:                sq.sender,
+					dailyRemain:           sq.dailyRemain,
+					effectiveContribution: contribution,
+				}
+				candidates = append(candidates, candidate)
+				totalEffectiveContribution += contribution
 			}
-			// Distribute any remainder due to rounding to the senders with capacity
-			if remainingForAccount > 0 {
-				for _, sq := range senderList {
-					if remainingForAccount == 0 {
+		}
+	}
+
+	if totalEffectiveContribution == 0 {
+		return plan, nil // No one can send emails
+	}
+
+	// 6.2 Proportional Distribution
+	totalAssigned := 0
+	for _, candidate := range candidates {
+		share := (candidate.effectiveContribution / totalEffectiveContribution) * float64(emailsToAssign)
+		assigned := min(int(share), candidate.dailyRemain)
+		plan.Assignments[candidate.sender.ID] = assigned
+		totalAssigned += assigned
+	}
+
+	// 6.3 Distribute Remainder
+	remainder := emailsToAssign - totalAssigned
+	if remainder > 0 {
+		// Sort candidates by their remaining capacity to fairly distribute the remainder
+		for i := 0; i < remainder; i++ {
+			for _, candidate := range candidates {
+				if plan.Assignments[candidate.sender.ID] < candidate.dailyRemain {
+					plan.Assignments[candidate.sender.ID]++
+					remainder--
+					if remainder == 0 {
 						break
 					}
-					canTake := sq.dailyRemain - plan.Assignments[sq.sender.ID]
-					take := min(remainingForAccount, canTake)
-					plan.Assignments[sq.sender.ID] += take
-					remainingForAccount -= take
 				}
+			}
+			if remainder == 0 {
+				break
 			}
 		}
 	}

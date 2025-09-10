@@ -1,0 +1,1 @@
+CREATE INDEX idx_email_templates_created_at ON email_templates(created_at DESC); 

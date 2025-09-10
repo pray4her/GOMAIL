@@ -19,6 +19,16 @@ const (
 	RecordStatusBounce    = "bounce"
 )
 
+// Constants for email task statuses
+const (
+	TaskStatusPending     = "pending"
+	TaskStatusScheduled   = "scheduled"
+	TaskStatusDispatching = "dispatching"
+	TaskStatusProcessing  = "processing"
+	TaskStatusCompleted   = "completed"
+	TaskStatusFailed      = "failed"
+)
+
 // Account represents a third-party email service provider account (e.g., Aliyun).
 // @Description Holds credentials and configuration for an external email service.
 type Account struct {
@@ -47,18 +57,28 @@ type Sender struct {
 // AccountSender links a Sender with a specific Account, defining a usable "from" address.
 // @Description Represents the many-to-many relationship between accounts and senders, with specific sending configurations.
 type AccountSender struct {
-	ID             int64     `json:"id" gorm:"primaryKey"`
-	AccountID      int64     `json:"account_id" gorm:"uniqueIndex:idx_account_sender;not null"`
-	SenderID       int64     `json:"sender_id" gorm:"uniqueIndex:idx_account_sender;not null"`
-	EmailAddress   string    `json:"email_address" gorm:"unique;not null"`
-	Weight         int       `json:"weight" gorm:"not null;default:100"`
-	DailySendLimit int       `json:"daily_send_limit" gorm:"not null"`
-	Status         string    `json:"status" gorm:"not null;default:'active'"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             int64           `json:"id" gorm:"primaryKey"`
+	AccountID      int64           `json:"account_id" gorm:"uniqueIndex:idx_account_sender;not null"`
+	SenderID       int64           `json:"sender_id" gorm:"uniqueIndex:idx_account_sender;not null"`
+	EmailAddress   string          `json:"email_address" gorm:"unique;not null"`
+	ReplyToEmail   *string         `json:"reply_to_email,omitempty"`
+	Weight         int             `json:"weight" gorm:"not null;default:100"`
+	DailySendLimit int             `json:"daily_send_limit" gorm:"not null"`
+	Status         string          `json:"status" gorm:"not null;default:'active'"`
+	Metadata       json.RawMessage `json:"metadata,omitempty" gorm:"type:jsonb"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 
 	Account Account `json:"account" gorm:"foreignKey:AccountID"`
 	Sender  Sender  `json:"sender" gorm:"foreignKey:SenderID"`
+}
+
+// PaginatedAccountSenders represents a paginated list of account senders.
+type PaginatedAccountSenders struct {
+	AccountSenders []AccountSender `json:"account_senders"`
+	TotalCount     int64           `json:"total_count"`
+	Page           int             `json:"page"`
+	PageSize       int             `json:"page_size"`
 }
 
 // EmailTemplate represents a reusable email template.
@@ -89,7 +109,6 @@ type EmailTask struct {
 
 	// Fields for tracking via Aliyun API
 	AliyunTagName    *string `json:"aliyun_tag_name,omitempty" gorm:"size:60"`
-	AliyunTagID      *string `json:"aliyun_tag_id,omitempty" gorm:"size:255"`
 	OpenCount        int     `json:"total_open_count" gorm:"not null;default:0"`
 	ClickCount       int     `json:"total_click_count" gorm:"not null;default:0"`
 	UniqueOpenCount  int     `json:"unique_open_count" gorm:"default:0"`
@@ -98,6 +117,14 @@ type EmailTask struct {
 	ClickRate        float64 `gorm:"default:0.0"`
 	UniqueOpenRate   float64 `gorm:"default:0.0"`
 	UniqueClickRate  float64 `gorm:"default:0.0"`
+
+	// New fields for manual slicing
+	SendLimit  *int `json:"send_limit,omitempty"`
+	SendOffset *int `json:"send_offset,omitempty"`
+
+	TotalRecipients int `json:"total_recipients" gorm:"default:0"`
+	SentCount       int `json:"sent_count" gorm:"default:0"`
+	FailedCount     int `json:"failed_count" gorm:"default:0"`
 
 	Template         EmailTemplate   `json:"template" gorm:"foreignKey:TemplateID"`
 	CreatedByUser    User            `json:"created_by_user" gorm:"foreignKey:CreatedByUserID"`
@@ -112,8 +139,6 @@ type EmailSendRecord struct {
 	TaskID             *int64     `json:"task_id"`
 	AccountSenderID    int64      `json:"account_sender_id" gorm:"not null"`
 	RecipientEmail     string     `json:"recipient_email" gorm:"not null"`
-	Subject            string     `json:"subject" gorm:"not null"`
-	Body               string     `json:"body" gorm:"type:text;not null"`
 	Status             string     `json:"status" gorm:"not null"`
 	AliyunTaskID       *string    `json:"aliyun_task_id"`
 	ErrorMessage       *string    `json:"error_message"`
@@ -213,4 +238,41 @@ type RecipientGroupRule struct {
 type RecipientGroupMember struct {
 	GroupID     int64 `gorm:"primaryKey"`
 	RecipientID int64 `gorm:"primaryKey"`
+}
+
+type DailySenderSentCount struct {
+	StatDate        time.Time `gorm:"type:date"`
+	AccountSenderID int64
+	SentCount       int
+}
+
+// Constants for import task statuses
+const (
+	ImportTaskStatusPending    = "pending"
+	ImportTaskStatusProcessing = "processing"
+	ImportTaskStatusCompleted  = "completed"
+	ImportTaskStatusFailed     = "failed"
+)
+
+// RecipientImportTask represents a batch recipient import job.
+// @Description Tracks the status and progress of batch recipient import operations.
+type RecipientImportTask struct {
+	ID               int64      `json:"id" gorm:"primaryKey"`
+	TaskName         string     `json:"task_name" gorm:"not null"`
+	FileName         string     `json:"file_name" gorm:"not null"`
+	FileSize         int64      `json:"file_size" gorm:"not null"`
+	FileType         string     `json:"file_type" gorm:"not null"`
+	Status           string     `json:"status" gorm:"not null;default:'pending'"`
+	TotalRecords     int        `json:"total_records" gorm:"default:0"`
+	ProcessedRecords int        `json:"processed_records" gorm:"default:0"`
+	SuccessRecords   int        `json:"success_records" gorm:"default:0"`
+	FailedRecords    int        `json:"failed_records" gorm:"default:0"`
+	ErrorMessage     *string    `json:"error_message"`
+	CreatedByUserID  int64      `json:"created_by_user_id" gorm:"not null"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	StartedAt        *time.Time `json:"started_at"`
+	CompletedAt      *time.Time `json:"completed_at"`
+
+	CreatedByUser User `json:"created_by_user" gorm:"foreignKey:CreatedByUserID"`
 }

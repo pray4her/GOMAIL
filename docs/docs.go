@@ -45,7 +45,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
@@ -53,7 +53,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/email-service_internal_model.Account"
+                                                "$ref": "#/definitions/model.Account"
                                             }
                                         }
                                     }
@@ -64,7 +64,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -93,7 +93,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.CreateAccountRequest"
+                            "$ref": "#/definitions/handler.CreateAccountRequest"
                         }
                     }
                 ],
@@ -103,13 +103,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.Account"
+                                            "$ref": "#/definitions/model.Account"
                                         }
                                     }
                                 }
@@ -119,13 +119,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -161,13 +161,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.Account"
+                                            "$ref": "#/definitions/model.Account"
                                         }
                                     }
                                 }
@@ -177,19 +177,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid account ID",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Account not found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -225,7 +225,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/email-service_internal_model.Account"
+                            "$ref": "#/definitions/model.Account"
                         }
                     }
                 ],
@@ -235,13 +235,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.Account"
+                                            "$ref": "#/definitions/model.Account"
                                         }
                                     }
                                 }
@@ -251,13 +251,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid account ID or request body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -291,7 +291,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
@@ -310,13 +310,85 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid account ID",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/accounts/{id}/senders": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieves a paginated list of all senders (AccountSender) associated with a given account ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Senders"
+                ],
+                "summary": "Get Senders by Account ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number for pagination",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Number of items per page",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A paginated list of account senders",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.PaginatedAccountSenders"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid ID or query parameters",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve senders",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -347,7 +419,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.SendEmailRequest"
+                            "$ref": "#/definitions/handler.SendEmailRequest"
                         }
                     }
                 ],
@@ -357,7 +429,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
@@ -374,13 +446,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -406,7 +478,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.loginRequest"
+                            "$ref": "#/definitions/handler.loginRequest"
                         }
                     }
                 ],
@@ -416,7 +488,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
@@ -435,19 +507,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "401": {
                         "description": "Invalid credentials",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -490,7 +562,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.PaginatedResponse"
+                                    "$ref": "#/definitions/handler.PaginatedResponse"
                                 },
                                 {
                                     "type": "object",
@@ -498,7 +570,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/email-service_internal_model.RecipientGroup"
+                                                "$ref": "#/definitions/model.RecipientGroup"
                                             }
                                         }
                                     }
@@ -509,7 +581,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -538,7 +610,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.CreateGroupRequest"
+                            "$ref": "#/definitions/handler.CreateGroupRequest"
                         }
                     }
                 ],
@@ -548,13 +620,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.RecipientGroup"
+                                            "$ref": "#/definitions/model.RecipientGroup"
                                         }
                                     }
                                 }
@@ -564,13 +636,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or parameters",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -606,13 +678,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.RecipientGroup"
+                                            "$ref": "#/definitions/model.RecipientGroup"
                                         }
                                     }
                                 }
@@ -622,19 +694,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or parameters",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Group not found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -670,7 +742,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.UpdateGroupRequest"
+                            "$ref": "#/definitions/handler.UpdateGroupRequest"
                         }
                     }
                 ],
@@ -680,13 +752,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.RecipientGroup"
+                                            "$ref": "#/definitions/model.RecipientGroup"
                                         }
                                     }
                                 }
@@ -696,19 +768,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or parameters",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Group not found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -743,19 +815,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid group ID",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Group not found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -793,7 +865,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.ModifyMembersRequest"
+                            "$ref": "#/definitions/handler.ModifyMembersRequest"
                         }
                     }
                 ],
@@ -801,25 +873,25 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully added members",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "400": {
                         "description": "Invalid request body or parameters",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Group not found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -855,7 +927,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.ModifyMembersRequest"
+                            "$ref": "#/definitions/handler.ModifyMembersRequest"
                         }
                     }
                 ],
@@ -863,25 +935,25 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully removed members",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "400": {
                         "description": "Invalid request body or parameters",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Group not found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -894,7 +966,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Retrieves a paginated list of all recipients.",
+                "description": "Retrieves a paginated list of all recipients. Can be filtered by name (fuzzy), email (exact), and metadata fields. Supports both traditional pagination (page/pageSize) and search_after pagination for deep pages.",
                 "produces": [
                     "application/json"
                 ],
@@ -905,14 +977,44 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page number (default: 1)",
+                        "description": "Page number (default: 1) - for traditional pagination",
                         "name": "page",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Number of items per page (default: 10)",
+                        "description": "Number of items per page (default: 10) - for traditional pagination",
                         "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Base64 encoded search_after value for deep pagination",
+                        "name": "search_after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items per page (default: 50) - for search_after pagination",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by recipient's first or last name (fuzzy search).",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by recipient's email address (exact match).",
+                        "name": "email",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by metadata field, e.g., metadata.promo_code=WINTER25",
+                        "name": "metadata.",
                         "in": "query"
                     }
                 ],
@@ -922,7 +1024,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.PaginatedResponse"
+                                    "$ref": "#/definitions/handler.PaginatedResponse"
                                 },
                                 {
                                     "type": "object",
@@ -930,7 +1032,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/email-service_internal_model.Recipient"
+                                                "$ref": "#/definitions/model.Recipient"
                                             }
                                         }
                                     }
@@ -938,10 +1040,16 @@ const docTemplate = `{
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -970,7 +1078,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.CreateRecipientRequest"
+                            "$ref": "#/definitions/handler.CreateRecipientRequest"
                         }
                     }
                 ],
@@ -980,13 +1088,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.Recipient"
+                                            "$ref": "#/definitions/model.Recipient"
                                         }
                                     }
                                 }
@@ -996,13 +1104,251 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/recipients/batch-upload": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Upload CSV, Excel, or JSON file to create multiple recipients.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Recipients"
+                ],
+                "summary": "Batch Upload Recipients",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Recipients file (CSV, Excel, or JSON)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Name for this import task",
+                        "name": "task_name",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.RecipientImportTask"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/recipients/batch-upload/sample/csv": {
+            "get": {
+                "description": "Downloads a sample CSV file with headers and example data to demonstrate the required format for batch uploads.",
+                "produces": [
+                    "text/csv"
+                ],
+                "tags": [
+                    "Recipients"
+                ],
+                "summary": "Download Sample CSV",
+                "responses": {
+                    "200": {
+                        "description": "CSV file",
+                        "schema": {
+                            "type": "file"
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "type": "string",
+                                "description": "attachment; filename=\\\"sample_recipients.csv\\"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/recipients/batch-upload/sample/json": {
+            "get": {
+                "description": "Downloads a sample JSON file with the required structure and example data for batch uploads.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Recipients"
+                ],
+                "summary": "Download Sample JSON",
+                "responses": {
+                    "200": {
+                        "description": "JSON file",
+                        "schema": {
+                            "type": "object"
+                        },
+                        "headers": {
+                            "Content-Disposition": {
+                                "type": "string",
+                                "description": "attachment; filename=\\\"sample_recipients.json\\"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/recipients/import-tasks": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieves a paginated list of the current user's import tasks.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Recipients"
+                ],
+                "summary": "List Import Tasks",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of items per page (default: 10)",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.PaginatedResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.RecipientImportTask"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/recipients/import-tasks/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieves the status and progress of a batch import task.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Recipients"
+                ],
+                "summary": "Get Import Task",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Import Task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.RecipientImportTask"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid task ID",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Import task not found",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1038,13 +1384,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.Recipient"
+                                            "$ref": "#/definitions/model.Recipient"
                                         }
                                     }
                                 }
@@ -1054,13 +1400,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid recipient ID",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Recipient not found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1096,7 +1442,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.UpdateRecipientRequest"
+                            "$ref": "#/definitions/handler.UpdateRecipientRequest"
                         }
                     }
                 ],
@@ -1106,13 +1452,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.Recipient"
+                                            "$ref": "#/definitions/model.Recipient"
                                         }
                                     }
                                 }
@@ -1122,13 +1468,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid recipient ID or request body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1163,13 +1509,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid recipient ID",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1200,7 +1546,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/email-service_internal_model.Sender"
+                            "$ref": "#/definitions/model.Sender"
                         }
                     }
                 ],
@@ -1210,13 +1556,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.Sender"
+                                            "$ref": "#/definitions/model.Sender"
                                         }
                                     }
                                 }
@@ -1226,13 +1572,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1277,7 +1623,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.AddSenderToAccountRequest"
+                            "$ref": "#/definitions/handler.AddSenderToAccountRequest"
                         }
                     }
                 ],
@@ -1287,13 +1633,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.AccountSender"
+                                            "$ref": "#/definitions/model.AccountSender"
                                         }
                                     }
                                 }
@@ -1303,13 +1649,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid ID or request body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Failed to associate sender with account",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1379,13 +1725,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_service.StatisticsResponse"
+                                            "$ref": "#/definitions/service.StatisticsResponse"
                                         }
                                     }
                                 }
@@ -1395,19 +1741,82 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request parameters",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
             }
         },
         "/api/v1/tasks": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieves a paginated list of all email tasks.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Tasks"
+                ],
+                "summary": "List Email Tasks",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number for pagination",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Number of tasks per page",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/handler.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/handler.ListTasksResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid page or pageSize parameters",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -1432,7 +1841,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.CreateEmailTaskRequest"
+                            "$ref": "#/definitions/handler.CreateEmailTaskRequest"
                         }
                     }
                 ],
@@ -1442,7 +1851,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1459,25 +1868,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - User not authenticated",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "403": {
                         "description": "Forbidden - User does not have permission to use the specified sender",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1513,13 +1922,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_service.TaskSummary"
+                                            "$ref": "#/definitions/service.TaskSummary"
                                         }
                                     }
                                 }
@@ -1529,13 +1938,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid Task ID",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1571,7 +1980,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1579,7 +1988,7 @@ const docTemplate = `{
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "$ref": "#/definitions/email-service_internal_model.EmailSendRecord"
+                                                "$ref": "#/definitions/model.EmailSendRecord"
                                             }
                                         }
                                     }
@@ -1590,19 +1999,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid Task ID",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Task not found or no records for this task",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1615,40 +2024,59 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Retrieves a list of all email templates.",
+                "description": "Retrieves a paginated list of email templates. If page and pageSize are not provided, returns all templates.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "Templates"
                 ],
-                "summary": "Get All Templates",
+                "summary": "Get Templates",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page number for pagination",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "Number of templates per page",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/definitions/email-service_internal_model.EmailTemplate"
-                                            }
+                                            "$ref": "#/definitions/handler.ListTemplatesResponse"
                                         }
                                     }
                                 }
                             ]
                         }
                     },
+                    "400": {
+                        "description": "Invalid page or pageSize parameters",
+                        "schema": {
+                            "$ref": "#/definitions/handler.Response"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1677,7 +2105,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.CreateTemplateRequest"
+                            "$ref": "#/definitions/handler.CreateTemplateRequest"
                         }
                     }
                 ],
@@ -1687,13 +2115,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.EmailTemplate"
+                                            "$ref": "#/definitions/model.EmailTemplate"
                                         }
                                     }
                                 }
@@ -1703,13 +2131,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1745,13 +2173,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.EmailTemplate"
+                                            "$ref": "#/definitions/model.EmailTemplate"
                                         }
                                     }
                                 }
@@ -1761,19 +2189,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid template ID",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Template not found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1809,7 +2237,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.UpdateTemplateRequest"
+                            "$ref": "#/definitions/handler.UpdateTemplateRequest"
                         }
                     }
                 ],
@@ -1819,13 +2247,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.EmailTemplate"
+                                            "$ref": "#/definitions/model.EmailTemplate"
                                         }
                                     }
                                 }
@@ -1835,13 +2263,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid template ID or request body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1875,7 +2303,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
@@ -1894,13 +2322,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid template ID",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -1938,7 +2366,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/email-service_internal_service.PreviewData"
+                            "$ref": "#/definitions/service.PreviewData"
                         }
                     }
                 ],
@@ -1948,13 +2376,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_service.RenderedTemplate"
+                                            "$ref": "#/definitions/service.RenderedTemplate"
                                         }
                                     }
                                 }
@@ -1964,19 +2392,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid template ID or request body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "404": {
                         "description": "Template not found",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -2007,7 +2435,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.createUserRequest"
+                            "$ref": "#/definitions/handler.createUserRequest"
                         }
                     }
                 ],
@@ -2017,13 +2445,13 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/internal_handler.Response"
+                                    "$ref": "#/definitions/handler.Response"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/email-service_internal_model.User"
+                                            "$ref": "#/definitions/model.User"
                                         }
                                     }
                                 }
@@ -2033,19 +2461,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "409": {
                         "description": "User with this username or email already exists",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     },
                     "500": {
                         "description": "Internal server error",
                         "schema": {
-                            "$ref": "#/definitions/internal_handler.Response"
+                            "$ref": "#/definitions/handler.Response"
                         }
                     }
                 }
@@ -2053,7 +2481,394 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "email-service_internal_model.Account": {
+        "handler.AddSenderToAccountRequest": {
+            "type": "object",
+            "required": [
+                "daily_send_limit",
+                "email_address"
+            ],
+            "properties": {
+                "daily_send_limit": {
+                    "type": "integer",
+                    "example": 1000
+                },
+                "email_address": {
+                    "type": "string",
+                    "example": "noreply@example.com"
+                }
+            }
+        },
+        "handler.CreateAccountRequest": {
+            "description": "Request body for creating a new Aliyun email account.",
+            "type": "object",
+            "required": [
+                "access_key_id",
+                "access_key_secret",
+                "domain",
+                "name"
+            ],
+            "properties": {
+                "access_key_id": {
+                    "type": "string",
+                    "example": "LTAI5txxxxxxxxxxxxxx"
+                },
+                "access_key_secret": {
+                    "type": "string",
+                    "example": "P1aXxxxxxxxxxxxxxxxxxxxxxx"
+                },
+                "daily_send_limit": {
+                    "type": "integer",
+                    "example": 5000
+                },
+                "domain": {
+                    "type": "string",
+                    "example": "mail.example.com"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Aliyun Account 1"
+                }
+            }
+        },
+        "handler.CreateEmailTaskRequest": {
+            "type": "object",
+            "required": [
+                "recipient_group_id",
+                "task_name"
+            ],
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "example": "\u003cp\u003eDear valued customer, here is a special offer just for you!\u003c/p\u003e"
+                },
+                "recipient_group_id": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "example": 5
+                },
+                "scheduled_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2025-01-01T12:00:00Z"
+                },
+                "subject": {
+                    "type": "string",
+                    "example": "Special Offer Inside!"
+                },
+                "task_name": {
+                    "type": "string",
+                    "example": "Q4 Promotion"
+                },
+                "template_id": {
+                    "type": "integer",
+                    "example": 10
+                }
+            }
+        },
+        "handler.CreateGroupRequest": {
+            "type": "object",
+            "required": [
+                "group_type",
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "group_type": {
+                    "type": "string",
+                    "enum": [
+                        "static",
+                        "dynamic"
+                    ]
+                },
+                "member_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "name": {
+                    "type": "string"
+                },
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.RecipientGroupRule"
+                    }
+                }
+            }
+        },
+        "handler.CreateRecipientRequest": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john.doe@example.com"
+                },
+                "first_name": {
+                    "type": "string",
+                    "example": "John"
+                },
+                "last_name": {
+                    "type": "string",
+                    "example": "Doe"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "handler.CreateTemplateRequest": {
+            "description": "Request body for creating a new email template.",
+            "type": "object",
+            "required": [
+                "body",
+                "name",
+                "subject"
+            ],
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "example": "\u003ch1\u003eHello {{.FirstName}}!\u003c/h1\u003e\u003cp\u003eThank you for joining us.\u003c/p\u003e"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Welcome Email"
+                },
+                "subject": {
+                    "type": "string",
+                    "example": "Welcome to Our Service!"
+                }
+            }
+        },
+        "handler.ListTasksResponse": {
+            "type": "object",
+            "properties": {
+                "pagination": {
+                    "$ref": "#/definitions/handler.Pagination"
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.EmailTask"
+                    }
+                }
+            }
+        },
+        "handler.ListTemplatesResponse": {
+            "type": "object",
+            "properties": {
+                "pagination": {
+                    "$ref": "#/definitions/handler.Pagination"
+                },
+                "templates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.EmailTemplate"
+                    }
+                }
+            }
+        },
+        "handler.ModifyMembersRequest": {
+            "type": "object",
+            "required": [
+                "member_ids"
+            ],
+            "properties": {
+                "member_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "handler.PaginatedResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "pagination": {
+                    "$ref": "#/definitions/handler.Pagination"
+                }
+            }
+        },
+        "handler.Pagination": {
+            "type": "object",
+            "properties": {
+                "has_next": {
+                    "description": "Indicates if there are more pages",
+                    "type": "boolean"
+                },
+                "next_search_after": {
+                    "description": "Only for search_after pagination",
+                    "type": "string"
+                },
+                "page": {
+                    "description": "Only for traditional pagination",
+                    "type": "integer"
+                },
+                "page_size": {
+                    "description": "Renamed for consistency",
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "description": "Only for traditional pagination",
+                    "type": "integer"
+                }
+            }
+        },
+        "handler.Response": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "handler.SendEmailRequest": {
+            "type": "object",
+            "required": [
+                "account_sender_id",
+                "html_body",
+                "subject",
+                "to_address"
+            ],
+            "properties": {
+                "account_sender_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "html_body": {
+                    "type": "string",
+                    "example": "\u003cp\u003eHello, this is a test email.\u003c/p\u003e"
+                },
+                "subject": {
+                    "type": "string",
+                    "example": "A Quick Message"
+                },
+                "to_address": {
+                    "type": "string",
+                    "example": "test.recipient@example.com"
+                }
+            }
+        },
+        "handler.UpdateGroupRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "rules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.RecipientGroupRule"
+                    }
+                }
+            }
+        },
+        "handler.UpdateRecipientRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john.doe.updated@example.com"
+                },
+                "first_name": {
+                    "type": "string",
+                    "example": "Johnathan"
+                },
+                "last_name": {
+                    "type": "string",
+                    "example": "Doe"
+                },
+                "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "status": {
+                    "type": "string",
+                    "example": "unsubscribed"
+                }
+            }
+        },
+        "handler.UpdateTemplateRequest": {
+            "description": "Request body for updating an existing email template.",
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "example": "\u003ch2\u003eHello {{.FirstName}}!\u003c/h2\u003e\u003cp\u003eWe are thrilled to have you.\u003c/p\u003e"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Welcome Email V2"
+                },
+                "subject": {
+                    "type": "string",
+                    "example": "A Warm Welcome to Our Service!"
+                }
+            }
+        },
+        "handler.createUserRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "new.user@example.com"
+                },
+                "is_admin": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "strongpassword"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "newuser"
+                }
+            }
+        },
+        "handler.loginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "example": "password123"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "admin"
+                }
+            }
+        },
+        "model.Account": {
             "description": "Holds credentials and configuration for an external email service.",
             "type": "object",
             "properties": {
@@ -2086,12 +2901,12 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_model.AccountSender": {
+        "model.AccountSender": {
             "description": "Represents the many-to-many relationship between accounts and senders, with specific sending configurations.",
             "type": "object",
             "properties": {
                 "account": {
-                    "$ref": "#/definitions/email-service_internal_model.Account"
+                    "$ref": "#/definitions/model.Account"
                 },
                 "account_id": {
                     "type": "integer"
@@ -2109,7 +2924,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "sender": {
-                    "$ref": "#/definitions/email-service_internal_model.Sender"
+                    "$ref": "#/definitions/model.Sender"
                 },
                 "sender_id": {
                     "type": "integer"
@@ -2125,12 +2940,12 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_model.EmailSendRecord": {
+        "model.EmailSendRecord": {
             "description": "Logs the details and delivery status of each individual email.",
             "type": "object",
             "properties": {
                 "account_sender": {
-                    "$ref": "#/definitions/email-service_internal_model.AccountSender"
+                    "$ref": "#/definitions/model.AccountSender"
                 },
                 "account_sender_id": {
                     "type": "integer"
@@ -2163,14 +2978,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "task": {
-                    "$ref": "#/definitions/email-service_internal_model.EmailTask"
+                    "$ref": "#/definitions/model.EmailTask"
                 },
                 "task_id": {
                     "type": "integer"
                 }
             }
         },
-        "email-service_internal_model.EmailTask": {
+        "model.EmailTask": {
             "description": "Defines a task to send a specific email (or template) to a list of recipients.",
             "type": "object",
             "properties": {
@@ -2191,9 +3006,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "created_by_user": {
-                    "$ref": "#/definitions/email-service_internal_model.User"
+                    "$ref": "#/definitions/model.User"
                 },
                 "created_by_user_id": {
+                    "type": "integer"
+                },
+                "failed_count": {
                     "type": "integer"
                 },
                 "id": {
@@ -2206,13 +3024,16 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "recipient_group": {
-                    "$ref": "#/definitions/email-service_internal_model.RecipientGroup"
+                    "$ref": "#/definitions/model.RecipientGroup"
                 },
                 "recipient_group_id": {
                     "type": "integer"
                 },
                 "scheduled_at": {
                     "type": "string"
+                },
+                "sent_count": {
+                    "type": "integer"
                 },
                 "status": {
                     "type": "string"
@@ -2224,7 +3045,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "template": {
-                    "$ref": "#/definitions/email-service_internal_model.EmailTemplate"
+                    "$ref": "#/definitions/model.EmailTemplate"
                 },
                 "template_id": {
                     "type": "integer"
@@ -2233,6 +3054,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "total_open_count": {
+                    "type": "integer"
+                },
+                "total_recipients": {
                     "type": "integer"
                 },
                 "uniqueClickRate": {
@@ -2252,7 +3076,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_model.EmailTemplate": {
+        "model.EmailTemplate": {
             "description": "Stores predefined subject and body for emails.",
             "type": "object",
             "properties": {
@@ -2276,7 +3100,27 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_model.Recipient": {
+        "model.PaginatedAccountSenders": {
+            "type": "object",
+            "properties": {
+                "account_senders": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.AccountSender"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.Recipient": {
             "description": "Stores information about a person who can receive emails, including custom data.",
             "type": "object",
             "properties": {
@@ -2309,7 +3153,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_model.RecipientGroup": {
+        "model.RecipientGroup": {
             "description": "Defines a group of recipients, which can be a fixed list (static) or rule-based (dynamic).",
             "type": "object",
             "properties": {
@@ -2317,7 +3161,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "created_by_user": {
-                    "$ref": "#/definitions/email-service_internal_model.User"
+                    "$ref": "#/definitions/model.User"
                 },
                 "created_by_user_id": {
                     "type": "integer"
@@ -2335,7 +3179,7 @@ const docTemplate = `{
                 "members": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/email-service_internal_model.Recipient"
+                        "$ref": "#/definitions/model.Recipient"
                     }
                 },
                 "name": {
@@ -2344,7 +3188,7 @@ const docTemplate = `{
                 "rules": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/email-service_internal_model.RecipientGroupRule"
+                        "$ref": "#/definitions/model.RecipientGroupRule"
                     }
                 },
                 "updated_at": {
@@ -2352,7 +3196,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_model.RecipientGroupRule": {
+        "model.RecipientGroupRule": {
             "description": "A rule used to dynamically include recipients in a group based on their attributes.",
             "type": "object",
             "properties": {
@@ -2375,7 +3219,64 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_model.Sender": {
+        "model.RecipientImportTask": {
+            "description": "Tracks the status and progress of batch recipient import operations.",
+            "type": "object",
+            "properties": {
+                "completed_at": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "created_by_user": {
+                    "$ref": "#/definitions/model.User"
+                },
+                "created_by_user_id": {
+                    "type": "integer"
+                },
+                "error_message": {
+                    "type": "string"
+                },
+                "failed_records": {
+                    "type": "integer"
+                },
+                "file_name": {
+                    "type": "string"
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "file_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "processed_records": {
+                    "type": "integer"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "success_records": {
+                    "type": "integer"
+                },
+                "task_name": {
+                    "type": "string"
+                },
+                "total_records": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Sender": {
             "description": "Contains information about the sender of an email.",
             "type": "object",
             "properties": {
@@ -2399,7 +3300,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_model.User": {
+        "model.User": {
             "description": "Defines a user of this email service platform, with roles and access rights.",
             "type": "object",
             "properties": {
@@ -2426,7 +3327,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_repository.DailyStatistics": {
+        "repository.DailyStatistics": {
             "type": "object",
             "properties": {
                 "click_count": {
@@ -2461,7 +3362,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_repository.OverallStatistics": {
+        "repository.OverallStatistics": {
             "type": "object",
             "properties": {
                 "overall_click_rate": {
@@ -2493,7 +3394,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_repository.SenderStatistics": {
+        "repository.SenderStatistics": {
             "type": "object",
             "properties": {
                 "account_name": {
@@ -2537,7 +3438,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_service.PreviewData": {
+        "service.PreviewData": {
             "type": "object",
             "properties": {
                 "email": {
@@ -2555,7 +3456,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_service.RenderedTemplate": {
+        "service.RenderedTemplate": {
             "type": "object",
             "properties": {
                 "body": {
@@ -2566,7 +3467,7 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_service.StatisticsPeriod": {
+        "service.StatisticsPeriod": {
             "type": "object",
             "properties": {
                 "days": {
@@ -2580,30 +3481,30 @@ const docTemplate = `{
                 }
             }
         },
-        "email-service_internal_service.StatisticsResponse": {
+        "service.StatisticsResponse": {
             "type": "object",
             "properties": {
                 "by_sender": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/email-service_internal_repository.SenderStatistics"
+                        "$ref": "#/definitions/repository.SenderStatistics"
                     }
                 },
                 "period": {
-                    "$ref": "#/definitions/email-service_internal_service.StatisticsPeriod"
+                    "$ref": "#/definitions/service.StatisticsPeriod"
                 },
                 "summary": {
-                    "$ref": "#/definitions/email-service_internal_repository.OverallStatistics"
+                    "$ref": "#/definitions/repository.OverallStatistics"
                 },
                 "time_series": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/email-service_internal_repository.DailyStatistics"
+                        "$ref": "#/definitions/repository.DailyStatistics"
                     }
                 }
             }
         },
-        "email-service_internal_service.TaskSummary": {
+        "service.TaskSummary": {
             "description": "Provides a high-level overview of an email task's performance.",
             "type": "object",
             "properties": {
@@ -2658,354 +3559,6 @@ const docTemplate = `{
                 "unique_open_rate": {
                     "type": "number",
                     "example": 0.4
-                }
-            }
-        },
-        "internal_handler.AddSenderToAccountRequest": {
-            "type": "object",
-            "required": [
-                "daily_send_limit",
-                "email_address"
-            ],
-            "properties": {
-                "daily_send_limit": {
-                    "type": "integer",
-                    "example": 1000
-                },
-                "email_address": {
-                    "type": "string",
-                    "example": "noreply@example.com"
-                }
-            }
-        },
-        "internal_handler.CreateAccountRequest": {
-            "description": "Request body for creating a new Aliyun email account.",
-            "type": "object",
-            "required": [
-                "access_key_id",
-                "access_key_secret",
-                "domain",
-                "name"
-            ],
-            "properties": {
-                "access_key_id": {
-                    "type": "string",
-                    "example": "LTAI5txxxxxxxxxxxxxx"
-                },
-                "access_key_secret": {
-                    "type": "string",
-                    "example": "P1aXxxxxxxxxxxxxxxxxxxxxxx"
-                },
-                "daily_send_limit": {
-                    "type": "integer",
-                    "example": 5000
-                },
-                "domain": {
-                    "type": "string",
-                    "example": "mail.example.com"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Aliyun Account 1"
-                }
-            }
-        },
-        "internal_handler.CreateEmailTaskRequest": {
-            "type": "object",
-            "required": [
-                "recipient_group_id",
-                "task_name"
-            ],
-            "properties": {
-                "body": {
-                    "type": "string",
-                    "example": "\u003cp\u003eDear valued customer, here is a special offer just for you!\u003c/p\u003e"
-                },
-                "recipient_group_id": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "example": 5
-                },
-                "scheduled_at": {
-                    "type": "string",
-                    "format": "date-time",
-                    "example": "2025-01-01T12:00:00Z"
-                },
-                "subject": {
-                    "type": "string",
-                    "example": "Special Offer Inside!"
-                },
-                "task_name": {
-                    "type": "string",
-                    "example": "Q4 Promotion"
-                },
-                "template_id": {
-                    "type": "integer",
-                    "example": 10
-                }
-            }
-        },
-        "internal_handler.CreateGroupRequest": {
-            "type": "object",
-            "required": [
-                "group_type",
-                "name"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "group_type": {
-                    "type": "string",
-                    "enum": [
-                        "static",
-                        "dynamic"
-                    ]
-                },
-                "member_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "name": {
-                    "type": "string"
-                },
-                "rules": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/email-service_internal_model.RecipientGroupRule"
-                    }
-                }
-            }
-        },
-        "internal_handler.CreateRecipientRequest": {
-            "type": "object",
-            "required": [
-                "email"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "john.doe@example.com"
-                },
-                "first_name": {
-                    "type": "string",
-                    "example": "John"
-                },
-                "last_name": {
-                    "type": "string",
-                    "example": "Doe"
-                },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": true
-                }
-            }
-        },
-        "internal_handler.CreateTemplateRequest": {
-            "description": "Request body for creating a new email template.",
-            "type": "object",
-            "required": [
-                "body",
-                "name",
-                "subject"
-            ],
-            "properties": {
-                "body": {
-                    "type": "string",
-                    "example": "\u003ch1\u003eHello {{.FirstName}}!\u003c/h1\u003e\u003cp\u003eThank you for joining us.\u003c/p\u003e"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Welcome Email"
-                },
-                "subject": {
-                    "type": "string",
-                    "example": "Welcome to Our Service!"
-                }
-            }
-        },
-        "internal_handler.ModifyMembersRequest": {
-            "type": "object",
-            "required": [
-                "member_ids"
-            ],
-            "properties": {
-                "member_ids": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                }
-            }
-        },
-        "internal_handler.PaginatedResponse": {
-            "type": "object",
-            "properties": {
-                "data": {},
-                "pagination": {
-                    "$ref": "#/definitions/internal_handler.Pagination"
-                }
-            }
-        },
-        "internal_handler.Pagination": {
-            "type": "object",
-            "properties": {
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
-        },
-        "internal_handler.Response": {
-            "type": "object",
-            "properties": {
-                "data": {},
-                "error": {
-                    "type": "string"
-                }
-            }
-        },
-        "internal_handler.SendEmailRequest": {
-            "type": "object",
-            "required": [
-                "account_sender_id",
-                "html_body",
-                "subject",
-                "to_address"
-            ],
-            "properties": {
-                "account_sender_id": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "html_body": {
-                    "type": "string",
-                    "example": "\u003cp\u003eHello, this is a test email.\u003c/p\u003e"
-                },
-                "subject": {
-                    "type": "string",
-                    "example": "A Quick Message"
-                },
-                "to_address": {
-                    "type": "string",
-                    "example": "test.recipient@example.com"
-                }
-            }
-        },
-        "internal_handler.UpdateGroupRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "description": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "rules": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/email-service_internal_model.RecipientGroupRule"
-                    }
-                }
-            }
-        },
-        "internal_handler.UpdateRecipientRequest": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "john.doe.updated@example.com"
-                },
-                "first_name": {
-                    "type": "string",
-                    "example": "Johnathan"
-                },
-                "last_name": {
-                    "type": "string",
-                    "example": "Doe"
-                },
-                "metadata": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
-                "status": {
-                    "type": "string",
-                    "example": "unsubscribed"
-                }
-            }
-        },
-        "internal_handler.UpdateTemplateRequest": {
-            "description": "Request body for updating an existing email template.",
-            "type": "object",
-            "properties": {
-                "body": {
-                    "type": "string",
-                    "example": "\u003ch2\u003eHello {{.FirstName}}!\u003c/h2\u003e\u003cp\u003eWe are thrilled to have you.\u003c/p\u003e"
-                },
-                "name": {
-                    "type": "string",
-                    "example": "Welcome Email V2"
-                },
-                "subject": {
-                    "type": "string",
-                    "example": "A Warm Welcome to Our Service!"
-                }
-            }
-        },
-        "internal_handler.createUserRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password",
-                "username"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "new.user@example.com"
-                },
-                "is_admin": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 8,
-                    "example": "strongpassword"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "newuser"
-                }
-            }
-        },
-        "internal_handler.loginRequest": {
-            "type": "object",
-            "required": [
-                "password",
-                "username"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string",
-                    "example": "password123"
-                },
-                "username": {
-                    "type": "string",
-                    "example": "admin"
                 }
             }
         }

@@ -91,3 +91,42 @@ func (h *SenderHandler) AddSenderToAccount(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, Response{Data: accountSender})
 }
+
+// GetSendersByAccountID handles retrieving all senders associated with a specific account.
+// @Summary Get Senders by Account ID
+// @Description Retrieves a paginated list of all senders (AccountSender) associated with a given account ID.
+// @Tags Senders
+// @Produce json
+// @Param id path int true "Account ID"
+// @Param page query int false "Page number for pagination" default(1)
+// @Param page_size query int false "Number of items per page" default(10)
+// @Success 200 {object} Response{data=model.PaginatedAccountSenders} "A paginated list of account senders"
+// @Failure 400 {object} Response "Invalid ID or query parameters"
+// @Failure 500 {object} Response "Failed to retrieve senders"
+// @Security ApiKeyAuth
+// @Router /api/v1/accounts/{id}/senders [get]
+func (h *SenderHandler) GetSendersByAccountID(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Response{Error: "Invalid account ID"})
+		return
+	}
+
+	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if err != nil || pageSize <= 0 {
+		pageSize = 10
+	}
+
+	paginatedSenders, err := h.service.GetSendersByAccountID(accountID, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{Data: paginatedSenders})
+}

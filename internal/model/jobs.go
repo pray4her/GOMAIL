@@ -5,6 +5,7 @@ package model
 // needing to query the database for sender or task details, thus preventing N+1 queries.
 type EmailJobPayload struct {
 	RecordID       int64         `json:"record_id"`
+	TaskID         int64         `json:"task_id"`
 	RecipientEmail string        `json:"recipient_email"`
 	Subject        string        `json:"subject"`
 	Body           string        `json:"body"`

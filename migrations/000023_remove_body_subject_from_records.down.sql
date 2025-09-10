@@ -1,0 +1,3 @@
+ALTER TABLE email_send_records
+ADD COLUMN subject VARCHAR(255) NOT NULL,
+ADD COLUMN body TEXT NOT NULL; 
